@@ -465,7 +465,7 @@ async def bcmd(bot: Bot, message: Message):
 
 # Command to show subscription plans
 @Bot.on_message(filters.command('plans') & filters.private)
-async def show_plans(bot: Bot, message: Message):
+async def show_plans(client: client, message: Message):
     plans_text = PAYMENT_TEXT
     buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("Pay via UPI", callback_data="upi_info")],
@@ -475,7 +475,7 @@ async def show_plans(bot: Bot, message: Message):
 
 # Command to show UPI payment QR code and instructions
 @Bot.on_message(filters.command('upi') & filters.private)
-async def upi_info(bot: Bot, message: Message):
+async def upi_info(client: Client, message: Message):
     await bot.send_photo(
         chat_id=message.chat.id,
         photo=PAYMENT_QR,
