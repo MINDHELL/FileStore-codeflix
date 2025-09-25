@@ -475,7 +475,7 @@ async def show_plans(client: Client, message: Message):
 
 # Show UPI payment QR code and instructions
 @Bot.on_message(filters.command('upi') & filters.private)
-async def upi_info(client: Client, message: Message):
+async def upi_info(bot: Bot, message: Message):
     await client.send_photo(
         chat_id=message.chat.id,
         photo=START_PIC,
