@@ -466,54 +466,7 @@ async def bcmd(bot: Bot, message: Message):
 # quick debug to confirm this file is imported when bot starts
 print("✅ premium/plans plugin loaded")
 
-# Show subscription plans to all users
-@Bot.on_message(filters.command('plans') & filters.private)
-async def show_plans(client: Client, message: Message):
-    try:
-        # fallback if PAYMENT_TEXT missing
-        plans_text = PAYMENT_TEXT if 'PAYMENT_TEXT' in globals() and PAYMENT_TEXT else (
-            "📦 Available Plans:\n\n💳 ₹20 – 1 Week\n💳 ₹50 – 1 Month\n💳 ₹80 – Premium Month"
-        )
-
-        # Owner URL
-        owner_url = f"https://t.me/{OWNER_ID}" if 'OWNER_ID' in globals() and OWNER_ID else "https://t.me/YourUsernameHere"
-
-        # URL button to open /upi
-        upi_url = f"https://t.me/{client.username}?start=upi"
-
-        buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Pay via UPI", url=upi_url)],  # changed to URL
-            [InlineKeyboardButton("Contact Support", url=owner_url)]
-        ])
-
-        await message.reply(plans_text, reply_markup=buttons, parse_mode=ParseMode.HTML)
-    except Exception as e:
-        await message.reply_text(f"⚠️ Error in /plans: {e}")
-        print("Error in /plans:", e)
-
-
-# Show UPI payment QR code and instructions
-@Bot.on_message(filters.command('upi') & filters.private)
-async def upi_info(client: Client, message: Message):
-    try:
-        # Use PAYMENT_QR if available, otherwise fallback to START_PIC
-        photo_to_send = PAYMENT_QR if 'PAYMENT_QR' in globals() and PAYMENT_QR else START_PIC
-
-        owner_url = f"https://t.me/{OWNER_ID}" if 'OWNER_ID' in globals() and OWNER_ID else "https://t.me/YourUsernameHere"
-
-        await client.send_photo(
-            chat_id=message.chat.id,
-            photo=photo_to_send,
-            caption=PAYMENT_TEXT if 'PAYMENT_TEXT' in globals() and PAYMENT_TEXT else "📦 Payment info not configured.",
-            parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("Contact Owner", url=owner_url)]]
-            )
-        )
-    except Exception as e:
-        await message.reply_text(f"⚠️ Error in /upi: {e}")
-        print("Error in /upi:", e)
-
-    @Bot.on_message(filters.command("ping") & filters.private)
+@Bot.on_message(filters.command("ping") & filters.private)
 async def ping_test(client, message):
     await message.reply_text("🏓 Pong!")
+
