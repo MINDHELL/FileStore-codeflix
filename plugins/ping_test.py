@@ -1,7 +1,15 @@
+from pyrogram import filters
+from pyrogram.types import Message
+from bot import Bot
+
+@Bot.on_message(filters.command("ping") & filters.private)
+async def ping_test(client, message: Message):
+    await message.reply_text("🏓 Pong! ✅")
+
 # plugins/subscription.py
 
 from pyrogram import filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.enums import ParseMode
 from bot import Bot
 from config import *
@@ -28,9 +36,4 @@ async def upi_info(bot: Bot, message):
         reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("Contact Owner", url=f"https://t.me/{OWNER}")]]
         )
-                                  )
-
-
-@Bot.on_message(filters.command("ping") & filters.private)
-async def ping_test(client, message: Message):
-    await message.reply_text("🏓 Pong! ✅")
+    )
