@@ -470,16 +470,19 @@ print("✅ premium/plans plugin loaded")
 @Bot.on_message(filters.command('plans') & filters.private)
 async def show_plans(client: Client, message: Message):
     try:
-        # safety fallback if PAYMENT_TEXT missing
+        # fallback if PAYMENT_TEXT missing
         plans_text = PAYMENT_TEXT if 'PAYMENT_TEXT' in globals() and PAYMENT_TEXT else (
             "📦 Available Plans:\n\n💳 ₹20 – 1 Week\n💳 ₹50 – 1 Month\n💳 ₹80 – Premium Month"
         )
 
-        # ensure owner URL is valid — OWNER_ID should be a username (without @). If numeric, replace with OWNER_USERNAME
+        # Owner URL
         owner_url = f"https://t.me/{OWNER_ID}" if 'OWNER_ID' in globals() and OWNER_ID else "https://t.me/YourUsernameHere"
 
+        # URL button to open /upi
+        upi_url = f"https://t.me/{client.username}?start=upi"
+
         buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Pay via UPI", callback_data="upi_info")],
+            [InlineKeyboardButton("Pay via UPI", url=upi_url)],  # changed to URL
             [InlineKeyboardButton("Contact Support", url=owner_url)]
         ])
 
@@ -493,7 +496,7 @@ async def show_plans(client: Client, message: Message):
 @Bot.on_message(filters.command('upi') & filters.private)
 async def upi_info(client: Client, message: Message):
     try:
-        # Use PAYMENT_QR if available, otherwise fallback to START_PIC to avoid crash
+        # Use PAYMENT_QR if available, otherwise fallback to START_PIC
         photo_to_send = PAYMENT_QR if 'PAYMENT_QR' in globals() and PAYMENT_QR else START_PIC
 
         owner_url = f"https://t.me/{OWNER_ID}" if 'OWNER_ID' in globals() and OWNER_ID else "https://t.me/YourUsernameHere"
