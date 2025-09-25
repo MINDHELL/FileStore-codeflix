@@ -478,7 +478,7 @@ async def show_plans(client: Client, message: Message):
 async def upi_info(client: Client, message: Message):
     await client.send_photo(
         chat_id=message.chat.id,
-        photo=PAYMENT_QR,
+        photo=START_PIC,
         caption=PAYMENT_TEXT,
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(
