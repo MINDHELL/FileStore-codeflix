@@ -465,7 +465,7 @@ async def bcmd(bot: Bot, message: Message):
 
 # Command to show subscription plans
 @Bot.on_message(filters.command('plans') & filters.private)
-async def show_plans(client: client, message: Message):
+async def show_plans(client: Client, message: Message):
     plans_text = PAYMENT_TEXT
     buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("Pay via UPI", callback_data="upi_info")],
