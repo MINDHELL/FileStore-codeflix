@@ -513,3 +513,7 @@ async def upi_info(client: Client, message: Message):
     except Exception as e:
         await message.reply_text(f"⚠️ Error in /upi: {e}")
         print("Error in /upi:", e)
+
+    @Bot.on_message(filters.command("ping") & filters.private)
+async def ping_test(client, message):
+    await message.reply_text("🏓 Pong!")
