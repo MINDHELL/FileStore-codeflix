@@ -20,7 +20,7 @@ async def show_plans(bot: Bot, message):
     plans_text = PAYMENT_TEXT
     buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("Pay via UPI", callback_data="upi_info")],
-        [InlineKeyboardButton("Contact Support", url=f"https://t.me/{OWNER}")]
+        [InlineKeyboardButton("Contact Support", url=f"https://t.me/{OWNER_ID}")]
     ])
     await message.reply(plans_text, reply_markup=buttons, parse_mode=ParseMode.HTML)
 
@@ -34,6 +34,23 @@ async def upi_info(bot: Bot, message):
         caption=PAYMENT_TEXT,
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("Contact Owner", url=f"https://t.me/{OWNER}")]]
+            [[InlineKeyboardButton("Contact Owner", url=f"https://t.me/{OWNER_ID}")]]
+        )
+    )
+
+# plugins/subscription.py (add this at the bottom)
+
+from pyrogram.types import CallbackQuery
+
+@Bot.on_callback_query(filters.regex("upi_info"))
+async def upi_button_handler(bot: Bot, query: CallbackQuery):
+    await query.answer()  # Acknowledge the button press
+    await bot.send_photo(
+        chat_id=query.from_user.id,
+        photo=START_PIC,  # or PAYMENT_QR if you have QR
+        caption=PAYMENT_TEXT,
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("Contact Owner", url=f"https://t.me/{OWNER_ID}")]]
         )
     )
