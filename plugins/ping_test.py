@@ -30,7 +30,7 @@ async def show_plans(bot: Bot, message):
 async def upi_info(bot: Bot, message):
     await bot.send_photo(
         chat_id=message.chat.id,
-        photo=PAYMENT_QR,
+        photo=START_PIC,
         caption=PAYMENT_TEXT,
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(
