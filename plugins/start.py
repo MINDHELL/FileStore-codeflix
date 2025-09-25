@@ -464,17 +464,17 @@ async def bcmd(bot: Bot, message: Message):
 
 
 # Command to show subscription plans
-@Bot.on_message(filters.command('plans') & filters.private)
+@Bot.on_message(filters.command('plans') & filters.private & admin)
 async def show_plans(client: Client, message: Message):
     plans_text = PAYMENT_TEXT
     buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("Pay via UPI", callback_data="upi_info")],
-        [InlineKeyboardButton("Contact Support", url=f"https://t.me/{OWNER}")]
+        [InlineKeyboardButton("Contact Support", url=f"https://t.me/{OWNER_ID}")]
     ])
     await message.reply(plans_text, reply_markup=buttons, parse_mode=ParseMode.HTML)
 
 # Command to show UPI payment QR code and instructions
-@Bot.on_message(filters.command('upi') & filters.private)
+@Bot.on_message(filters.command('upi') & filters.private & admin)
 async def upi_info(client: Client, message: Message):
     await bot.send_photo(
         chat_id=message.chat.id,
@@ -482,7 +482,7 @@ async def upi_info(client: Client, message: Message):
         caption=PAYMENT_TEXT,
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("Contact Owner", url=f"https://t.me/{OWNER}")]]
+            [[InlineKeyboardButton("Contact Owner", url=f"https://t.me/{OWNER_ID}")]]
         )
     )
 
