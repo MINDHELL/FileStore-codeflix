@@ -145,9 +145,9 @@ async def check_user_plan(user_id):
                 (remaining_time.seconds // 60) % 60,
                 remaining_time.seconds % 60,
             )
-            validity_info = f"Your premium plan is active. {days}d {hours}h {minutes}m {seconds}s left."
+            validity_info = f"Your premium plan is active🤩.\n\n {days}d {hours}h {minutes}m {seconds}s left."
             return validity_info
         else:
-            return "Your premium plan has expired."
+            return "Your premium plan has expired.🫡"
     else:
-        return "You do not have a premium plan."
+        return "You do not have a premium plan.🥲\n\n please use /upi or /plans.🙂"
