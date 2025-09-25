@@ -486,3 +486,10 @@ async def upi_info(client: Client, message: Message):
         )
     )
     
+
+
+@Bot.on_message(filters.command("plans") & filters.private)
+async def show_plans(client: Client, message: Message):
+    await message.reply_text(
+        "📦 Available Plans:\n\n💳 ₹20 – 1 Week\n💳 ₹50 – 1 Month\n💳 ₹80 – Premium Month"
+    )
