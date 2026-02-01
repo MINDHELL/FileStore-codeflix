@@ -99,18 +99,18 @@ SCREENSHOT_URL = os.environ.get("SCREENSHOT_URL", f"t.me/Xsupprt4bot")
 #7 Days
 PRICE1 = os.environ.get("PRICE1", "20 rs")
 #1 Month
-PRICE2 = os.environ.get("PRICE2", "50 rs")
+PRICE2 = os.environ.get("PRICE2", "89 rs")
 #3 Month
-PRICE3 = os.environ.get("PRICE3", "100 rs")
+PRICE3 = os.environ.get("PRICE3", "300 rs")
 #6 Month
-PRICE4 = os.environ.get("PRICE4", "150 rs")
+PRICE4 = os.environ.get("PRICE4", "600 rs")
 #1 Year
 PRICE5 = os.environ.get("PRICE5", "❌️ rs")
 
 #payment 
 
 PAYMENT_TEXT = os.getenv('PAYMENT_TEXT', '<b>- ᴀᴠᴀɪʟᴀʙʟᴇ ᴘʟᴀɴs - \n\n'
-                                      '- 20ʀs - 1 ᴡᴇᴇᴋ\n- 50ʀs - 1 ᴍᴏɴᴛʜ\n'
+                                      '- 20ʀs - 1 ᴡᴇᴇᴋ\n- 89ʀs - 1 ᴍᴏɴᴛʜ\n'
                                       '- 100ʀs - 3 ᴍᴏɴᴛʜs\n- 300ʀs - 6 ᴍᴏɴᴛʜs\n\n'
                                       '🎁 ᴘʀᴇᴍɪᴜᴍ ғᴇᴀᴛᴜʀᴇs 🎁\n\n'
                                       '○ ɴᴏ ɴᴇᴇᴅ ᴛᴏ ᴠᴇʀɪғʏ\n○ ɴᴏ ɴᴇᴇᴅ ᴛᴏ ᴏᴘᴇɴ ʟɪɴᴋ\n'
