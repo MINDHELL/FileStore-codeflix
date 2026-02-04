@@ -44,9 +44,9 @@ START_PIC = os.environ.get("START_PIC", "https://envs.sh/Ghs.jpg")
 FORCE_PIC = os.environ.get("FORCE_PIC", "https://telegra.ph/file/e292b12890b8b4b9dcbd1.jpg")
 
 #--------------------------------------------
-SHORTLINK_URL = os.environ.get("SHORTLINK_URL", "linkshortify.com")
-SHORTLINK_API = os.environ.get("SHORTLINK_API", "")
-VERIFY_EXPIRE = int(os.environ.get('VERIFY_EXPIRE', 60)) # Add time in seconds
+SHORTLINK_URL = os.environ.get("SHORTLINK_URL", "vplink.in")
+SHORTLINK_API = os.environ.get("SHORTLINK_API", "ee4c6892fd0acac564be8afb9a2db6b7ddbac61e")
+VERIFY_EXPIRE = int(os.environ.get('VERIFY_EXPIRE', 600)) # Add time in seconds
 TUT_VID = os.environ.get("TUT_VID","https://t.me/allvidsbackup3/13")
 
 #--------------------------------------------
