@@ -70,10 +70,10 @@ async def autopost_old(client, message):
     current_id = load_last_id()
     posted = 0
     checked = 0
+    empty_batches = 0
 
     status = await message.reply(
-        f"🚀 Auto-post started\n"
-        f"▶️ From Message ID: {current_id}"
+        f"🚀 Auto-post started\n▶️ From Message ID: {current_id}"
     )
 
     while True:
@@ -87,11 +87,9 @@ async def autopost_old(client, message):
         except:
             break
 
-        if not messages:
-            break
+        valid_found = False
 
         for msg in messages:
-
             current_id += 1
             save_last_id(current_id)
 
@@ -101,6 +99,7 @@ async def autopost_old(client, message):
             if not msg:
                 continue
 
+            valid_found = True
             checked += 1
 
             if not msg.video:
@@ -110,10 +109,8 @@ async def autopost_old(client, message):
                 continue
 
             try:
-                # 1️⃣ Store video in DB channel
                 stored = await msg.copy(client.db_channel.id)
 
-                # 2️⃣ Generate FileStore link
                 key = f"get-{stored.id * abs(client.db_channel.id)}"
                 token = await encode(key)
                 link = f"https://t.me/{client.username}?start={token}"
@@ -123,14 +120,10 @@ async def autopost_old(client, message):
                     f"🔗 <a href='{link}'>Watch / Download</a>"
                 )
 
-                # 3️⃣ Thumbnail
                 thumb = None
                 if msg.video.thumbs:
-                    thumb = await client.download_media(
-                        msg.video.thumbs[0].file_id
-                    )
+                    thumb = await client.download_media(msg.video.thumbs[0].file_id)
 
-                # 4️⃣ Send post
                 if thumb:
                     await client.send_photo(TARGET_CHANNEL, thumb, caption)
                     os.remove(thumb)
@@ -139,19 +132,25 @@ async def autopost_old(client, message):
 
                 mark_done(msg.id)
                 posted += 1
-
-                if posted % 5 == 0:
-                    await status.edit(
-                        f"🚀 Auto-posting...\n\n"
-                        f"📤 Posted: {posted}\n"
-                        f"🔍 Checked: {checked}\n"
-                        f"🆔 Current ID: {current_id}"
-                    )
-
                 await asyncio.sleep(AUTO_POST_DELAY)
 
-            except Exception:
+            except:
                 continue
+
+        # 🧠 DEAD ID DETECTION
+        if not valid_found:
+            empty_batches += 1
+        else:
+            empty_batches = 0
+
+        # 🔁 AUTO RESET WHEN IDs ARE DEAD
+        if empty_batches >= 5:
+            current_id = 1
+            save_last_id(1)
+            empty_batches = 0
+
+        if current_id > 5_000_000:
+            break
 
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
@@ -161,4 +160,4 @@ async def autopost_old(client, message):
         f"📤 New Videos Posted: {posted}\n"
         f"🔍 Messages Checked: {checked}\n"
         f"🆔 Last ID Scanned: {current_id}"
-    )
+                )
