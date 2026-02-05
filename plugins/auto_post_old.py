@@ -1,4 +1,4 @@
-# (©) Codeflix-Bots | Auto Post Old Videos (STABLE FINAL)
+# (©) Codeflix-Bots | Auto Post Old Videos — FINAL STABLE
 
 import asyncio
 import os
@@ -8,11 +8,11 @@ from helper_func import encode
 from config import SOURCE_CHANNEL, TARGET_CHANNEL, AUTO_POST_DELAY, OWNER_ID
 
 PROGRESS_FILE = "autopost_progress.txt"
-DONE_FILE = "posted_ids.txt"
 STOP_FILE = "autopost.stop"
+DONE_FILE = "posted_ids.txt"
 
 
-# ---------- Helpers ----------
+# ─────────── Helpers ───────────
 
 def load_last_id():
     if os.path.exists(PROGRESS_FILE):
@@ -20,41 +20,46 @@ def load_last_id():
     return 1
 
 
-def save_last_id(mid):
-    open(PROGRESS_FILE, "w").write(str(mid))
-
-
-def is_done(mid):
-    if not os.path.exists(DONE_FILE):
-        return False
-    return str(mid) in open(DONE_FILE).read().splitlines()
-
-
-def mark_done(mid):
-    open(DONE_FILE, "a").write(f"{mid}\n")
+def save_last_id(msg_id):
+    open(PROGRESS_FILE, "w").write(str(msg_id))
 
 
 def stop_requested():
     return os.path.exists(STOP_FILE)
 
 
-# ---------- Admin Commands ----------
+def is_done(msg_id):
+    if not os.path.exists(DONE_FILE):
+        return False
+    return str(msg_id) in open(DONE_FILE).read().splitlines()
+
+
+def mark_done(msg_id):
+    with open(DONE_FILE, "a") as f:
+        f.write(f"{msg_id}\n")
+
+
+# ─────────── Admin Commands ───────────
 
 @Bot.on_message(filters.private & filters.command("stop_autopost") & filters.user(OWNER_ID))
-async def stop_autopost(_, msg):
+async def stop_autopost(_, message):
     open(STOP_FILE, "w").close()
-    await msg.reply("🛑 Auto-post stopped safely.")
+    await message.reply("🛑 Auto-post stopped.")
 
 
 @Bot.on_message(filters.private & filters.command("reset_autopost") & filters.user(OWNER_ID))
-async def reset_autopost(_, msg):
-    for f in [PROGRESS_FILE, DONE_FILE, STOP_FILE]:
+async def reset_autopost(_, message):
+    for f in (PROGRESS_FILE, DONE_FILE, STOP_FILE):
         if os.path.exists(f):
             os.remove(f)
-    await msg.reply("♻️ Auto-post reset.\nWill start from first video.")
+
+    await message.reply(
+        "♻️ Auto-post RESET\n\n"
+        "Bot will start again from FIRST video."
+    )
 
 
-# ---------- Auto Post ----------
+# ─────────── Auto Post ───────────
 
 @Bot.on_message(filters.private & filters.command("autopost_old") & filters.user(OWNER_ID))
 async def autopost_old(client, message):
@@ -62,45 +67,53 @@ async def autopost_old(client, message):
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
 
-    start_id = load_last_id()
+    current_id = load_last_id()
     posted = 0
     checked = 0
 
     status = await message.reply(
-        f"🚀 Auto-post started\n▶️ From ID: {start_id}"
+        f"🚀 Auto-post started\n"
+        f"▶️ From Message ID: {current_id}"
     )
 
-    # 🔥 Get LATEST message ID from channel
-    latest = await client.get_messages(SOURCE_CHANNEL, 1)
-    if not latest:
-        await status.edit("⚠️ Source channel is empty.")
-        return
-
-    last_id = latest.id
-
-    current = start_id
-
-    while current <= last_id:
+    while True:
 
         if stop_requested():
-            await status.edit("🛑 Auto-post stopped by admin.")
-            return
+            break
 
         try:
-            msg = await client.get_messages(SOURCE_CHANNEL, current)
+            ids = list(range(current_id, current_id + 20))
+            messages = await client.get_messages(SOURCE_CHANNEL, ids)
         except:
-            current += 1
-            continue
+            break
 
-        checked += 1
-        save_last_id(current)
+        if not messages:
+            break
 
-        if msg and msg.video and not is_done(msg.id):
+        for msg in messages:
+
+            current_id += 1
+            save_last_id(current_id)
+
+            if stop_requested():
+                break
+
+            if not msg:
+                continue
+
+            checked += 1
+
+            if not msg.video:
+                continue
+
+            if is_done(msg.id):
+                continue
+
             try:
-                # 1️⃣ Copy to DB
+                # 1️⃣ Store video in DB channel
                 stored = await msg.copy(client.db_channel.id)
 
-                # 2️⃣ Generate link
+                # 2️⃣ Generate FileStore link
                 key = f"get-{stored.id * abs(client.db_channel.id)}"
                 token = await encode(key)
                 link = f"https://t.me/{client.username}?start={token}"
@@ -128,24 +141,24 @@ async def autopost_old(client, message):
                 posted += 1
 
                 if posted % 5 == 0:
-                    percent = round((current / last_id) * 100, 2)
                     await status.edit(
-                        f"🚀 Posting...\n"
+                        f"🚀 Auto-posting...\n\n"
                         f"📤 Posted: {posted}\n"
-                        f"📊 Progress: {percent}%"
+                        f"🔍 Checked: {checked}\n"
+                        f"🆔 Current ID: {current_id}"
                     )
 
                 await asyncio.sleep(AUTO_POST_DELAY)
 
-            except Exception as e:
-                print(e)
+            except Exception:
+                continue
 
-        current += 1
+    if os.path.exists(STOP_FILE):
+        os.remove(STOP_FILE)
 
-    # ✅ ALWAYS SHOW COMPLETION MESSAGE
     await status.edit(
-        f"✅ Auto-post completed successfully\n\n"
+        "✅ Auto-post completed successfully\n\n"
         f"📤 New Videos Posted: {posted}\n"
-        f"🔎 Messages Checked: {checked}\n"
-        f"🆔 Last ID Scanned: {last_id}"
+        f"🔍 Messages Checked: {checked}\n"
+        f"🆔 Last ID Scanned: {current_id}"
     )
