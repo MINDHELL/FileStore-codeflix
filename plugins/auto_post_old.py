@@ -1,4 +1,4 @@
-# (©) Codeflix-Bots | Auto Post Old Videos — FINAL STABLE
+# (©) Codeflix-Bots | Auto Post Old Videos (FINAL — FIXED)
 
 import asyncio
 import os
@@ -11,17 +11,22 @@ PROGRESS_FILE = "autopost_progress.txt"
 STOP_FILE = "autopost.stop"
 DONE_FILE = "posted_ids.txt"
 
+BATCH_SIZE = 20
 
-# ─────────── Helpers ───────────
+
+# ---------- Helpers ----------
 
 def load_last_id():
-    if os.path.exists(PROGRESS_FILE):
-        return int(open(PROGRESS_FILE).read().strip())
-    return 1
+    try:
+        with open(PROGRESS_FILE, "r") as f:
+            return int(f.read().strip())
+    except:
+        return 0   # IMPORTANT: start from 0, not 1
 
 
 def save_last_id(msg_id):
-    open(PROGRESS_FILE, "w").write(str(msg_id))
+    with open(PROGRESS_FILE, "w") as f:
+        f.write(str(msg_id))
 
 
 def stop_requested():
@@ -31,7 +36,8 @@ def stop_requested():
 def is_done(msg_id):
     if not os.path.exists(DONE_FILE):
         return False
-    return str(msg_id) in open(DONE_FILE).read().splitlines()
+    with open(DONE_FILE, "r") as f:
+        return str(msg_id) in f.read().splitlines()
 
 
 def mark_done(msg_id):
@@ -39,7 +45,7 @@ def mark_done(msg_id):
         f.write(f"{msg_id}\n")
 
 
-# ─────────── Admin Commands ───────────
+# ---------- Admin Commands ----------
 
 @Bot.on_message(filters.private & filters.command("stop_autopost") & filters.user(OWNER_ID))
 async def stop_autopost(_, message):
@@ -49,17 +55,16 @@ async def stop_autopost(_, message):
 
 @Bot.on_message(filters.private & filters.command("reset_autopost") & filters.user(OWNER_ID))
 async def reset_autopost(_, message):
-    for f in (PROGRESS_FILE, DONE_FILE, STOP_FILE):
+    for f in [PROGRESS_FILE, DONE_FILE]:
         if os.path.exists(f):
             os.remove(f)
+    if os.path.exists(STOP_FILE):
+        os.remove(STOP_FILE)
 
-    await message.reply(
-        "♻️ Auto-post RESET\n\n"
-        "Bot will start again from FIRST video."
-    )
+    await message.reply("♻️ Auto-post RESET.\nWill start from first video again.")
 
 
-# ─────────── Auto Post ───────────
+# ---------- Auto Post ----------
 
 @Bot.on_message(filters.private & filters.command("autopost_old") & filters.user(OWNER_ID))
 async def autopost_old(client, message):
@@ -67,13 +72,13 @@ async def autopost_old(client, message):
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
 
-    current_id = load_last_id()
+    current = load_last_id()
     posted = 0
     checked = 0
-    empty_batches = 0
+    last_scanned = current
 
     status = await message.reply(
-        f"🚀 Auto-post started\n▶️ From Message ID: {current_id}"
+        f"🚀 Auto-post started\n▶️ From Message ID: {current}"
     )
 
     while True:
@@ -82,16 +87,19 @@ async def autopost_old(client, message):
             break
 
         try:
-            ids = list(range(current_id, current_id + 20))
-            messages = await client.get_messages(SOURCE_CHANNEL, ids)
+            # ✅ Ask Telegram for messages AFTER current ID
+            messages = await client.get_messages(
+                SOURCE_CHANNEL,
+                min_id=current,
+                limit=BATCH_SIZE
+            )
         except:
             break
 
-        valid_found = False
+        if not messages:
+            break  # real completion
 
         for msg in messages:
-            current_id += 1
-            save_last_id(current_id)
 
             if stop_requested():
                 break
@@ -99,8 +107,8 @@ async def autopost_old(client, message):
             if not msg:
                 continue
 
-            valid_found = True
             checked += 1
+            last_scanned = max(last_scanned, msg.id)
 
             if not msg.video:
                 continue
@@ -109,8 +117,10 @@ async def autopost_old(client, message):
                 continue
 
             try:
+                # 1️⃣ Copy to DB channel
                 stored = await msg.copy(client.db_channel.id)
 
+                # 2️⃣ Generate link
                 key = f"get-{stored.id * abs(client.db_channel.id)}"
                 token = await encode(key)
                 link = f"https://t.me/{client.username}?start={token}"
@@ -120,10 +130,14 @@ async def autopost_old(client, message):
                     f"🔗 <a href='{link}'>Watch / Download</a>"
                 )
 
+                # 3️⃣ Thumbnail
                 thumb = None
                 if msg.video.thumbs:
-                    thumb = await client.download_media(msg.video.thumbs[0].file_id)
+                    thumb = await client.download_media(
+                        msg.video.thumbs[0].file_id
+                    )
 
+                # 4️⃣ Send post
                 if thumb:
                     await client.send_photo(TARGET_CHANNEL, thumb, caption)
                     os.remove(thumb)
@@ -132,32 +146,29 @@ async def autopost_old(client, message):
 
                 mark_done(msg.id)
                 posted += 1
+
+                if posted % 5 == 0:
+                    await status.edit(
+                        f"🚀 Posting...\n"
+                        f"📤 Posted: {posted}\n"
+                        f"🆔 Last ID: {last_scanned}"
+                    )
+
                 await asyncio.sleep(AUTO_POST_DELAY)
 
             except:
                 continue
 
-        # 🧠 DEAD ID DETECTION
-        if not valid_found:
-            empty_batches += 1
-        else:
-            empty_batches = 0
-
-        # 🔁 AUTO RESET WHEN IDs ARE DEAD
-        if empty_batches >= 5:
-            current_id = 1
-            save_last_id(1)
-            empty_batches = 0
-
-        if current_id > 5_000_000:
-            break
+        # ✅ move forward ONLY to real last scanned ID
+        current = last_scanned
+        save_last_id(current)
 
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
 
     await status.edit(
-        "✅ Auto-post completed successfully\n\n"
+        f"✅ Auto-post completed successfully\n\n"
         f"📤 New Videos Posted: {posted}\n"
-        f"🔍 Messages Checked: {checked}\n"
-        f"🆔 Last ID Scanned: {current_id}"
-                )
+        f"🔎 Messages Checked: {checked}\n"
+        f"🆔 Last ID Scanned: {last_scanned}"
+)
