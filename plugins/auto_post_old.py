@@ -1,4 +1,4 @@
-# (©) Codeflix-Bots | Auto Post Old Videos (FINAL STABLE)
+# (©) Codeflix-Bots | Auto Post Old Videos (START + STOP + RESUME + PROGRESS)
 
 import asyncio
 import os
@@ -55,8 +55,8 @@ async def reset_autopost(_, message):
     if os.path.exists(PROGRESS_FILE):
         os.remove(PROGRESS_FILE)
     await message.reply(
-        "♻️ Auto-post progress reset.\n\n"
-        "Next run will start from the FIRST video."
+        "♻️ Auto-post progress reset.\n"
+        "Next run will start from FIRST video."
     )
 
 
@@ -67,18 +67,18 @@ async def autopost_old(client, message):
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
 
-    status = await message.reply("🚀 Starting auto-post…")
+    status = await message.reply("🚀 Auto-posting started...")
 
     last_id = load_last_id()
-    current = last_id
     posted = 0
+    current = last_id
 
-    # ── Get total message count safely (last message ID)
+    # Get total messages (for percentage)
     try:
         last_msg = await client.get_messages(SOURCE_CHANNEL, limit=1)
-        TOTAL_IDS = last_msg[0].id if last_msg else 1
+        total_ids = last_msg[0].id if last_msg else 1
     except:
-        TOTAL_IDS = 1
+        total_ids = 1
 
     while True:
 
@@ -103,64 +103,70 @@ async def autopost_old(client, message):
                 break
 
             if not msg or not msg.video:
+                save_last_id(current)
                 continue
 
             try:
-                # 1️⃣ Copy video to DB channel
+                # 1️⃣ Store video in DB channel
                 stored = await msg.copy(
                     chat_id=client.db_channel.id,
                     disable_notification=True
                 )
 
-                # 2️⃣ Generate FileStore link (BOT link)
+                # 2️⃣ Generate FileStore link
                 key = f"get-{stored.id * abs(client.db_channel.id)}"
                 token = await encode(key)
                 link = f"https://t.me/{client.username}?start={token}"
 
                 caption = (
-                    "🎬 New Video Uploaded\n\n"
-                    f"🔗 Watch / Download:\n{link}"
+                    "🎬 <b>New Video Uploaded</b>\n"
+                    "❤️ <b>MUST JOIN @ALLVIDSBACKUP3</b>\n\n"
+                    f"🔗 <a href='{link}'>Watch / Download</a>"
                 )
+                
 
-                # 3️⃣ Download thumbnail safely
+                
+
+                # 3️⃣ Download thumbnail
                 thumb_path = None
                 if msg.video.thumbs:
                     thumb_path = await client.download_media(
                         msg.video.thumbs[0].file_id
                     )
 
-                # 4️⃣ Send thumbnail + caption to TARGET
+                # 4️⃣ Send post to TARGET
                 if thumb_path:
                     await client.send_photo(
-                        chat_id=TARGET_CHANNEL,
+                        TARGET_CHANNEL,
                         photo=thumb_path,
                         caption=caption
                     )
                     os.remove(thumb_path)
                 else:
                     await client.send_message(
-                        chat_id=TARGET_CHANNEL,
-                        text=caption
+                        TARGET_CHANNEL,
+                        caption
                     )
 
                 save_last_id(msg.id)
                 posted += 1
 
-                # ── Progress update every 5 posts
+                # 🔄 Live progress update every 5 posts
                 if posted % 5 == 0:
-                    percent = min(int((current / TOTAL_IDS) * 100), 100)
+                    percent = min(int((msg.id / total_ids) * 100), 100)
                     bar = make_progress_bar(percent)
 
                     await status.edit(
-                        "🚀 Auto-Posting…\n\n"
+                        "🚀 Auto-Posting...\n\n"
                         f"📊 Progress: {bar} {percent}%\n"
                         f"📤 Posted: {posted}\n"
-                        f"📌 Current ID: {msg.id}"
+                        f"📌 Last ID: {msg.id}"
                     )
 
                 await asyncio.sleep(AUTO_POST_DELAY)
 
             except Exception as e:
+                save_last_id(current)
                 await status.edit(f"⚠ Skipped ID {msg.id}\n{e}")
                 continue
 
@@ -168,18 +174,18 @@ async def autopost_old(client, message):
 
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
-        percent = min(int((current / TOTAL_IDS) * 100), 100)
+        percent = min(int((current / total_ids) * 100), 100)
         bar = make_progress_bar(percent)
 
         await status.edit(
-            "🛑 Auto-post Stopped\n\n"
+            "🛑 Auto-post stopped\n\n"
             f"📊 Progress: {bar} {percent}%\n"
             f"📤 Posted: {posted}"
         )
         return
 
     await status.edit(
-        "✅ Auto-post Finished\n\n"
+        "✅ Auto-post finished\n\n"
         "📊 Progress: ████████████████████ 100%\n"
         f"📤 Total Posted: {posted}"
     )
