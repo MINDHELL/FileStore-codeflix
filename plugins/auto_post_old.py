@@ -69,12 +69,15 @@ async def autopost_old(client, message):
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
 
-    current = load_last_id()
+    start_id = load_last_id()
+    current_id = start_id
+
     posted = 0
     checked = 0
+    found_video_in_run = False
 
     status = await message.reply(
-        f"🚀 Auto-post started\n▶️ From Message ID: {current}"
+        f"🚀 Auto-post started\n▶️ From Message ID: {start_id}"
     )
 
     while True:
@@ -82,7 +85,7 @@ async def autopost_old(client, message):
         if stop_requested():
             break
 
-        ids = list(range(current, current + BATCH_SIZE))
+        ids = list(range(current_id, current_id + 20))
 
         try:
             messages = await client.get_messages(SOURCE_CHANNEL, ids)
@@ -92,11 +95,11 @@ async def autopost_old(client, message):
         if not messages:
             break
 
-        empty_batch = True
+        batch_has_video = False
 
         for msg in messages:
-            current += 1
-            save_last_id(current)
+
+            current_id += 1
 
             if stop_requested():
                 break
@@ -104,20 +107,21 @@ async def autopost_old(client, message):
             if not msg:
                 continue
 
-            empty_batch = False
             checked += 1
 
             if not msg.video:
                 continue
 
+            batch_has_video = True
+            found_video_in_run = True
+
+            # ❗ Skip already posted
             if is_done(msg.id):
                 continue
 
             try:
-                # 1️⃣ Copy to DB channel
                 stored = await msg.copy(client.db_channel.id)
 
-                # 2️⃣ Generate FileStore link
                 key = f"get-{stored.id * abs(client.db_channel.id)}"
                 token = await encode(key)
                 link = f"https://t.me/{client.username}?start={token}"
@@ -127,14 +131,12 @@ async def autopost_old(client, message):
                     f"🔗 <a href='{link}'>Watch / Download</a>"
                 )
 
-                # 3️⃣ Thumbnail
                 thumb = None
                 if msg.video.thumbs:
                     thumb = await client.download_media(
                         msg.video.thumbs[0].file_id
                     )
 
-                # 4️⃣ Send post
                 if thumb:
                     await client.send_photo(TARGET_CHANNEL, thumb, caption)
                     os.remove(thumb)
@@ -142,13 +144,14 @@ async def autopost_old(client, message):
                     await client.send_message(TARGET_CHANNEL, caption)
 
                 mark_done(msg.id)
+                save_last_id(msg.id)  # ✅ SAVE ONLY VIDEO ID
                 posted += 1
 
                 if posted % 5 == 0:
                     await status.edit(
                         f"🚀 Posting...\n"
                         f"📤 Posted: {posted}\n"
-                        f"🆔 Last ID: {current}"
+                        f"🆔 Last Video ID: {msg.id}"
                     )
 
                 await asyncio.sleep(AUTO_POST_DELAY)
@@ -156,15 +159,23 @@ async def autopost_old(client, message):
             except:
                 continue
 
-        if empty_batch:
+        # ❌ If this batch had NO videos at all → STOP
+        if not batch_has_video:
             break
 
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
 
-    await status.edit(
-        f"✅ Auto-post completed successfully\n\n"
-        f"📤 New Videos Posted: {posted}\n"
-        f"🔎 Messages Checked: {checked}\n"
-        f"🆔 Last ID Scanned: {current}"
+    # ✅ Proper completion messages
+    if not found_video_in_run:
+        await status.edit(
+            "✅ Auto-post completed\n\n"
+            "📭 No new videos found."
+        )
+    else:
+        await status.edit(
+            f"✅ Auto-post completed successfully\n\n"
+            f"📤 New Videos Posted: {posted}\n"
+            f"🔎 Messages Checked: {checked}\n"
+            f"🆔 Last Video ID: {load_last_id()}"
     )
