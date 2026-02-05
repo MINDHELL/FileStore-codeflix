@@ -56,6 +56,9 @@ async def reset_autopost(_, message):
     for f in [PROGRESS_FILE, DONE_FILE]:
         if os.path.exists(f):
             os.remove(f)
+    if os.path.exists(STOP_FILE):
+        os.remove(STOP_FILE)
+
     await message.reply("♻️ Auto-post RESET.\nWill start from first video again.")
 
 
@@ -69,6 +72,7 @@ async def autopost_old(client, message):
 
     current = load_last_id()
     posted = 0
+    checked = 0
 
     status = await message.reply(
         f"🚀 Auto-post started\n▶️ From ID: {current}"
@@ -90,16 +94,22 @@ async def autopost_old(client, message):
 
         for msg in messages:
 
-            current = msg.id + 1
-            save_last_id(current)
-
             if stop_requested():
                 break
 
-            if not msg or not msg.video:
+            if not msg:
                 continue
 
-            # 🔥 DUPLICATE PROTECTION
+            checked += 1
+
+            # Always move forward
+            current = msg.id
+            save_last_id(current)
+
+            if not msg.video:
+                continue
+
+            # ✅ HARD DUPLICATE PROTECTION
             if is_done(msg.id):
                 continue
 
@@ -136,7 +146,9 @@ async def autopost_old(client, message):
 
                 if posted % 5 == 0:
                     await status.edit(
-                        f"🚀 Posting...\n📤 Posted: {posted}\n➡️ ID: {current}"
+                        f"🚀 Posting...\n"
+                        f"📤 Posted: {posted}\n"
+                        f"🆔 Last ID: {current}"
                     )
 
                 await asyncio.sleep(AUTO_POST_DELAY)
@@ -144,9 +156,16 @@ async def autopost_old(client, message):
             except:
                 continue
 
+        # Move to next batch
+        current += 1
+        save_last_id(current)
+
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
 
     await status.edit(
-        f"✅ Auto-post finished\n📤 Total Posted: {posted}"
-        )
+        f"✅ Auto-post completed\n\n"
+        f"📤 New Videos Posted: {posted}\n"
+        f"🔎 Messages Checked: {checked}\n"
+        f"🆔 Last ID: {current}"
+               )
