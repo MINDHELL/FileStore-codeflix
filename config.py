@@ -28,7 +28,7 @@ OWNER = os.environ.get("OWNER", "Xsupprt4bot") # Owner username without @
 OWNER_ID = int(os.environ.get("OWNER_ID", "7437503888")) # Owner id
 #--------------------------------------------
 PORT = os.environ.get("PORT", "8001")
-SOURCE_CHANNEL = -1003722980766   # your source channel ID
+SOURCE_CHANNEL = -1003892719753   # your source channel ID
 TARGET_CHANNEL = -1003861148198   # your target channel ID
 AUTO_POST_DELAY = 20             # 5 minutes (safe)
 
@@ -84,7 +84,7 @@ CMD_TXT = """<blockquote><b>» ᴀᴅᴍɪɴ ᴄᴏᴍᴍᴀɴᴅs:</b></blockqu
 """
 #--------------------------------------------
 CUSTOM_CAPTION = os.environ.get("CUSTOM_CAPTION", "<b>• ʙʏ @allvidsbackup3</b>") #set your Custom Caption here, Keep None for Disable Custom Caption
-PROTECT_CONTENT = True if os.environ.get('PROTECT_CONTENT', "False") == "True" else False #set True if you want to prevent users from forwarding files from bot
+PROTECT_CONTENT = True if os.environ.get('PROTECT_CONTENT', "True") == "True" else False #set True if you want to prevent users from forwarding files from bot
 #--------------------------------------------
 #Set true if you want Disable your Channel Posts Share button
 DISABLE_CHANNEL_BUTTON = os.environ.get("DISABLE_CHANNEL_BUTTON", None) == 'True'
