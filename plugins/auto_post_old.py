@@ -1,4 +1,4 @@
-# (©) Codeflix-Bots | Auto Post Old Videos (START + STOP)
+# (©) Codeflix-Bots | Auto Post Old Videos # (©) Codeflix-Bots | Auto Post Old Videos (START + STOP)
 
 import asyncio
 import os
@@ -32,7 +32,7 @@ def stop_requested():
 async def stop_autopost(_, message):
     with open(STOP_FILE, "w") as f:
         f.write("stop")
-    await message.reply("🛑 Auto-post stopped successfully.")
+    await message.reply("🛑 Auto-post stopped.")
 
 
 @Bot.on_message(filters.private & filters.command("autopost_old"))
@@ -50,9 +50,6 @@ async def autopost_old(client, message):
     while True:
 
         if stop_requested():
-            await message.reply(
-                f"🛑 Auto-post stopped.\n📤 Posted so far: {posted}"
-            )
             break
 
         try:
@@ -70,16 +67,13 @@ async def autopost_old(client, message):
             current += 1
 
             if stop_requested():
-                await message.reply(
-                    f"🛑 Auto-post stopped.\n📤 Posted so far: {posted}"
-                )
-                return
+                break
 
             if not msg or not msg.video:
                 continue
 
             try:
-                # 1️⃣ Copy video to DB channel
+                # 1️⃣ Store video in DB channel
                 stored = await msg.copy(client.db_channel.id)
 
                 # 2️⃣ Generate FileStore link
@@ -99,20 +93,18 @@ async def autopost_old(client, message):
                         msg.video.thumbs[0].file_id
                     )
 
-                # 4️⃣ Send post to target channel
+                # 4️⃣ Send post (NO parse_mode here)
                 if thumb_path:
                     await client.send_photo(
                         TARGET_CHANNEL,
                         photo=thumb_path,
-                        caption=caption,
-                        parse_mode="HTML"
+                        caption=caption
                     )
                     os.remove(thumb_path)
                 else:
                     await client.send_message(
                         TARGET_CHANNEL,
-                        caption,
-                        parse_mode="HTML"
+                        caption
                     )
 
                 save_last_id(msg.id)
@@ -120,12 +112,10 @@ async def autopost_old(client, message):
                 await asyncio.sleep(AUTO_POST_DELAY)
 
             except Exception as e:
-                await message.reply(
-                    f"⚠ Skipped ID {msg.id}\n<code>{e}</code>"
-                )
+                await message.reply(f"⚠ Skipped ID {msg.id}\n<code>{e}</code>")
                 continue
 
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
 
-    await message.reply(f"✅ Auto-post finished.\n📤 Total posted: {posted}")
+    await message.reply(f"✅ Auto-post finished.\n📤 Posted: {posted}")
