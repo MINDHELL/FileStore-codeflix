@@ -62,8 +62,8 @@ async def autopost_old(client, message):
                 )
 
                 # 3️⃣ Download thumbnail (CRITICAL STEP)
-                thumb_path = await msg.video.download_thumb()
-
+                thumb_path = await msg.download(thumb=True)
+                
                 # 4️⃣ Send thumbnail + caption to target channel
                 await client.send_photo(
                     chat_id=TARGET_CHANNEL,
