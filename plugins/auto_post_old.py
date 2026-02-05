@@ -65,7 +65,6 @@ async def reset_autopost(_, message):
 
 
 # ---------- Auto Post ----------
-
 @Bot.on_message(filters.private & filters.command("autopost_old") & filters.user(OWNER_ID))
 async def autopost_old(client, message):
 
@@ -83,8 +82,7 @@ async def autopost_old(client, message):
 
     async for msg in client.get_chat_history(
         chat_id=SOURCE_CHANNEL,
-        offset_id=last_id,
-        reverse=True
+        min_id=last_id
     ):
 
         if stop_requested():
@@ -102,14 +100,15 @@ async def autopost_old(client, message):
         if not msg.video:
             continue
 
+        # HARD DUPLICATE PROTECTION
         if is_done(msg.id):
             continue
 
         try:
-            # 1️⃣ Copy to DB
+            # 1️⃣ Copy video to DB channel
             stored = await msg.copy(client.db_channel.id)
 
-            # 2️⃣ Generate link
+            # 2️⃣ Generate FileStore link
             key = f"get-{stored.id * abs(client.db_channel.id)}"
             token = await encode(key)
             link = f"https://t.me/{client.username}?start={token}"
@@ -126,7 +125,7 @@ async def autopost_old(client, message):
                     msg.video.thumbs[0].file_id
                 )
 
-            # 4️⃣ Post
+            # 4️⃣ Send post
             if thumb:
                 await client.send_photo(TARGET_CHANNEL, thumb, caption)
                 os.remove(thumb)
@@ -156,4 +155,4 @@ async def autopost_old(client, message):
         f"📤 New Videos Posted: {posted}\n"
         f"🔎 Messages Checked: {checked}\n"
         f"🆔 Last ID Scanned: {newest_id}"
-        )
+            )
