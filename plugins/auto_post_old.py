@@ -1,15 +1,17 @@
-# (©) Codeflix-Bots | Auto Post Old Videos (START + STOP)
+# (©) Codeflix-Bots | Auto Post Old Videos (FINAL STABLE)
 
 import asyncio
 import os
 from pyrogram import filters
 from bot import Bot
 from helper_func import encode
-from config import SOURCE_CHANNEL, TARGET_CHANNEL, AUTO_POST_DELAY
+from config import SOURCE_CHANNEL, TARGET_CHANNEL, AUTO_POST_DELAY, ADMINS
 
 PROGRESS_FILE = "autopost_progress.txt"
 STOP_FILE = "autopost.stop"
 
+
+# ─────────── HELPERS ───────────
 
 def load_last_id():
     try:
@@ -28,40 +30,55 @@ def stop_requested():
     return os.path.exists(STOP_FILE)
 
 
-@Bot.on_message(filters.private & filters.command("stop_autopost"))
+def make_progress_bar(percent, length=20):
+    filled = int(length * percent / 100)
+    return "█" * filled + "░" * (length - filled)
+
+
+def is_admin(_, __, message):
+    return message.from_user and message.from_user.id in ADMINS
+
+
+admin_filter = filters.create(is_admin)
+
+# ─────────── COMMANDS ───────────
+
+@Bot.on_message(filters.private & filters.command("stop_autopost") & admin_filter)
 async def stop_autopost(_, message):
     with open(STOP_FILE, "w") as f:
         f.write("stop")
-    await message.reply("🛑 Auto-post stopped.")
+    await message.reply("🛑 Auto-post stop requested.")
 
 
-@Bot.on_message(filters.private & filters.command("reset_autopost"))
+@Bot.on_message(filters.private & filters.command("reset_autopost") & admin_filter)
 async def reset_autopost(_, message):
-    if os.path.exists("autopost_progress.txt"):
-        os.remove("autopost_progress.txt")
-        await message.reply(
-            "♻️ Auto-post progress reset!\n\n"
-            "Now the bot will start posting from the FIRST video again."
-        )
-    else:
-        await message.reply(
-            "ℹ️ No progress file found.\n"
-            "Auto-post will already start from beginning."
-        )
+    if os.path.exists(PROGRESS_FILE):
+        os.remove(PROGRESS_FILE)
+    await message.reply(
+        "♻️ Auto-post progress reset.\n\n"
+        "Next run will start from the FIRST video."
+    )
 
 
-
-@Bot.on_message(filters.private & filters.command("autopost_old"))
+@Bot.on_message(filters.private & filters.command("autopost_old") & admin_filter)
 async def autopost_old(client, message):
 
+    # clear old stop flag
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
 
-    await message.reply("🚀 Auto-posting started...")
+    status = await message.reply("🚀 Starting auto-post…")
 
     last_id = load_last_id()
-    posted = 0
     current = last_id
+    posted = 0
+
+    # ── Get total message count safely (last message ID)
+    try:
+        last_msg = await client.get_messages(SOURCE_CHANNEL, limit=1)
+        TOTAL_IDS = last_msg[0].id if last_msg else 1
+    except:
+        TOTAL_IDS = 1
 
     while True:
 
@@ -89,49 +106,80 @@ async def autopost_old(client, message):
                 continue
 
             try:
-                # 1️⃣ Store video in DB channel
-                stored = await msg.copy(client.db_channel.id)
+                # 1️⃣ Copy video to DB channel
+                stored = await msg.copy(
+                    chat_id=client.db_channel.id,
+                    disable_notification=True
+                )
 
-                # 2️⃣ Generate FileStore link
+                # 2️⃣ Generate FileStore link (BOT link)
                 key = f"get-{stored.id * abs(client.db_channel.id)}"
                 token = await encode(key)
                 link = f"https://t.me/{client.username}?start={token}"
 
                 caption = (
-                    "🎬 <b>New Video Uploaded</b>\n\n"
-                    f"🔗 <a href='{link}'>Watch / Download</a>"
+                    "🎬 New Video Uploaded\n\n"
+                    f"🔗 Watch / Download:\n{link}"
                 )
 
-                # 3️⃣ Download thumbnail
+                # 3️⃣ Download thumbnail safely
                 thumb_path = None
                 if msg.video.thumbs:
                     thumb_path = await client.download_media(
                         msg.video.thumbs[0].file_id
                     )
 
-                # 4️⃣ Send post (NO parse_mode here)
+                # 4️⃣ Send thumbnail + caption to TARGET
                 if thumb_path:
                     await client.send_photo(
-                        TARGET_CHANNEL,
+                        chat_id=TARGET_CHANNEL,
                         photo=thumb_path,
                         caption=caption
                     )
                     os.remove(thumb_path)
                 else:
                     await client.send_message(
-                        TARGET_CHANNEL,
-                        caption
+                        chat_id=TARGET_CHANNEL,
+                        text=caption
                     )
 
                 save_last_id(msg.id)
                 posted += 1
+
+                # ── Progress update every 5 posts
+                if posted % 5 == 0:
+                    percent = min(int((current / TOTAL_IDS) * 100), 100)
+                    bar = make_progress_bar(percent)
+
+                    await status.edit(
+                        "🚀 Auto-Posting…\n\n"
+                        f"📊 Progress: {bar} {percent}%\n"
+                        f"📤 Posted: {posted}\n"
+                        f"📌 Current ID: {msg.id}"
+                    )
+
                 await asyncio.sleep(AUTO_POST_DELAY)
 
             except Exception as e:
-                await message.reply(f"⚠ Skipped ID {msg.id}\n<code>{e}</code>")
+                await status.edit(f"⚠ Skipped ID {msg.id}\n{e}")
                 continue
+
+    # ─────────── FINAL STATUS ───────────
 
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
+        percent = min(int((current / TOTAL_IDS) * 100), 100)
+        bar = make_progress_bar(percent)
 
-    await message.reply(f"✅ Auto-post finished.\n📤 Posted: {posted}")
+        await status.edit(
+            "🛑 Auto-post Stopped\n\n"
+            f"📊 Progress: {bar} {percent}%\n"
+            f"📤 Posted: {posted}"
+        )
+        return
+
+    await status.edit(
+        "✅ Auto-post Finished\n\n"
+        "📊 Progress: ████████████████████ 100%\n"
+        f"📤 Total Posted: {posted}"
+    )
