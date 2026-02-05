@@ -1,4 +1,4 @@
-# (©) Codeflix-Bots | Auto Post Old Videos (SAFE VERSION)
+# (©) Codeflix-Bots | Auto Post Old Videos (START + STOP)
 
 import asyncio
 import os
@@ -8,14 +8,15 @@ from helper_func import encode
 from config import SOURCE_CHANNEL, TARGET_CHANNEL, AUTO_POST_DELAY
 
 PROGRESS_FILE = "autopost_progress.txt"
-BATCH_SIZE = 50   # Safe batch (do NOT increase)
+STOP_FILE = "autopost.stop"
 
 
 def load_last_id():
-    if os.path.exists(PROGRESS_FILE):
+    try:
         with open(PROGRESS_FILE, "r") as f:
             return int(f.read().strip())
-    return 1
+    except:
+        return 1
 
 
 def save_last_id(msg_id):
@@ -23,76 +24,108 @@ def save_last_id(msg_id):
         f.write(str(msg_id))
 
 
+def stop_requested():
+    return os.path.exists(STOP_FILE)
+
+
+@Bot.on_message(filters.private & filters.command("stop_autopost"))
+async def stop_autopost(_, message):
+    with open(STOP_FILE, "w") as f:
+        f.write("stop")
+    await message.reply("🛑 Auto-post stopped successfully.")
+
+
 @Bot.on_message(filters.private & filters.command("autopost_old"))
 async def autopost_old(client, message):
-    await message.reply("🚀 Auto-post started safely...")
+
+    if os.path.exists(STOP_FILE):
+        os.remove(STOP_FILE)
+
+    await message.reply("🚀 Auto-posting started...")
 
     last_id = load_last_id()
     posted = 0
+    current = last_id
 
     while True:
-        try:
-            ids = list(range(last_id, last_id + BATCH_SIZE))
-            messages = await client.get_messages(SOURCE_CHANNEL, ids)
 
-            video_msgs = [m for m in messages if m and m.video]
-
-            if not video_msgs:
-                break
-
-            for msg in video_msgs:
-                try:
-                    # 1️⃣ Copy video to DB channel
-                    stored = await msg.copy(
-                        chat_id=client.db_channel.id,
-                        disable_notification=True
-                    )
-
-                    # 2️⃣ Generate FileStore link
-                    key = f"get-{stored.id * abs(client.db_channel.id)}"
-                    base64 = await encode(key)
-                    link = f"https://t.me/{client.username}?start={base64}"
-
-                    caption = (
-                        "🎬 <b>New Video Uploaded</b>\n\n"
-                        f"🔗 <a href='{link}'>Watch / Download</a>"
-                    )
-
-                    # 3️⃣ Handle thumbnail safely
-                    thumb_path = None
-                    if msg.video.thumbs:
-                        thumb_path = await client.download_media(
-                            msg.video.thumbs[0].file_id
-                        )
-
-                    # 4️⃣ Send post to TARGET channel
-                    if thumb_path:
-                        await client.send_photo(
-                            chat_id=TARGET_CHANNEL,
-                            photo=thumb_path,
-                            caption=caption,
-                            parse_mode="html"
-                        )
-                        os.remove(thumb_path)
-                    else:
-                        await client.send_message(
-                            chat_id=TARGET_CHANNEL,
-                            text=caption,
-                            parse_mode="html"
-                        )
-
-                    save_last_id(msg.id)
-                    posted += 1
-                    await asyncio.sleep(AUTO_POST_DELAY)
-
-                except Exception as e:
-                    await message.reply(f"⚠ Skipped ID {msg.id}\n<code>{e}</code>")
-                    continue
-
-            last_id += BATCH_SIZE
-
-        except Exception as e:
-            await message.reply(f"❌ Stopped:\n<code>{e}</code>")
+        if stop_requested():
+            await message.reply(
+                f"🛑 Auto-post stopped.\n📤 Posted so far: {posted}"
+            )
             break
 
-    await message.reply(f"✅ Auto-post finished.\n📤 Posted: {posted}")
+        try:
+            messages = await client.get_messages(
+                SOURCE_CHANNEL,
+                list(range(current, current + 20))
+            )
+        except:
+            break
+
+        if not messages:
+            break
+
+        for msg in messages:
+            current += 1
+
+            if stop_requested():
+                await message.reply(
+                    f"🛑 Auto-post stopped.\n📤 Posted so far: {posted}"
+                )
+                return
+
+            if not msg or not msg.video:
+                continue
+
+            try:
+                # 1️⃣ Copy video to DB channel
+                stored = await msg.copy(client.db_channel.id)
+
+                # 2️⃣ Generate FileStore link
+                key = f"get-{stored.id * abs(client.db_channel.id)}"
+                token = await encode(key)
+                link = f"https://t.me/{client.username}?start={token}"
+
+                caption = (
+                    "🎬 <b>New Video Uploaded</b>\n\n"
+                    f"🔗 <a href='{link}'>Watch / Download</a>"
+                )
+
+                # 3️⃣ Download thumbnail
+                thumb_path = None
+                if msg.video.thumbs:
+                    thumb_path = await client.download_media(
+                        msg.video.thumbs[0].file_id
+                    )
+
+                # 4️⃣ Send post to target channel
+                if thumb_path:
+                    await client.send_photo(
+                        TARGET_CHANNEL,
+                        photo=thumb_path,
+                        caption=caption,
+                        parse_mode="HTML"
+                    )
+                    os.remove(thumb_path)
+                else:
+                    await client.send_message(
+                        TARGET_CHANNEL,
+                        caption,
+                        parse_mode="HTML"
+                    )
+
+                save_last_id(msg.id)
+                posted += 1
+                await asyncio.sleep(AUTO_POST_DELAY)
+
+            except Exception as e:
+                await message.reply(
+                    f"⚠ Skipped ID {msg.id}\n<code>{e}</code>"
+                )
+                continue
+
+    if os.path.exists(STOP_FILE):
+        os.remove(STOP_FILE)
+
+    await message.reply(f"✅ Auto-post finished.\n📤 Total posted: {posted}")
