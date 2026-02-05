@@ -72,13 +72,13 @@ async def autopost_old(client, message):
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
 
-    current = load_last_id()
+    last_id = load_last_id()
     posted = 0
     checked = 0
-    last_scanned = current
+    max_id = last_id
 
     status = await message.reply(
-        f"🚀 Auto-post started\n▶️ From Message ID: {current}"
+        f"🚀 Auto-post started\n▶️ From Message ID: {last_id}"
     )
 
     while True:
@@ -87,13 +87,13 @@ async def autopost_old(client, message):
             break
 
         try:
-            # ✅ Ask Telegram for messages AFTER current ID
+            # ✅ CORRECT WAY
             messages = await client.get_messages(
                 SOURCE_CHANNEL,
-                min_id=current,
-                limit=BATCH_SIZE
+                offset_id=last_id,
+                limit=20
             )
-        except:
+        except Exception as e:
             break
 
         if not messages:
@@ -108,7 +108,7 @@ async def autopost_old(client, message):
                 continue
 
             checked += 1
-            last_scanned = max(last_scanned, msg.id)
+            max_id = max(max_id, msg.id)
 
             if not msg.video:
                 continue
@@ -151,7 +151,7 @@ async def autopost_old(client, message):
                     await status.edit(
                         f"🚀 Posting...\n"
                         f"📤 Posted: {posted}\n"
-                        f"🆔 Last ID: {last_scanned}"
+                        f"🆔 Last ID: {max_id}"
                     )
 
                 await asyncio.sleep(AUTO_POST_DELAY)
@@ -159,9 +159,9 @@ async def autopost_old(client, message):
             except:
                 continue
 
-        # ✅ move forward ONLY to real last scanned ID
-        current = last_scanned
-        save_last_id(current)
+        # ✅ MOVE FORWARD SAFELY
+        last_id = max_id
+        save_last_id(last_id)
 
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
@@ -170,5 +170,5 @@ async def autopost_old(client, message):
         f"✅ Auto-post completed successfully\n\n"
         f"📤 New Videos Posted: {posted}\n"
         f"🔎 Messages Checked: {checked}\n"
-        f"🆔 Last ID Scanned: {last_scanned}"
-)
+        f"🆔 Last ID Scanned: {last_id}"
+                    )
