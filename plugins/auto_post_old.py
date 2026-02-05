@@ -1,4 +1,4 @@
-# (©) Codeflix-Bots | Auto Post Old Videos (Pyrogram compatible)
+# (©) Codeflix-Bots | Auto Post Old Videos (SAFE VERSION)
 
 import asyncio
 import os
@@ -8,14 +8,14 @@ from helper_func import encode
 from config import SOURCE_CHANNEL, TARGET_CHANNEL, AUTO_POST_DELAY
 
 PROGRESS_FILE = "autopost_progress.txt"
+BATCH_SIZE = 50   # Safe batch (do NOT increase)
 
 
 def load_last_id():
-    try:
+    if os.path.exists(PROGRESS_FILE):
         with open(PROGRESS_FILE, "r") as f:
             return int(f.read().strip())
-    except:
-        return 0
+    return 1
 
 
 def save_last_id(msg_id):
@@ -25,72 +25,74 @@ def save_last_id(msg_id):
 
 @Bot.on_message(filters.private & filters.command("autopost_old"))
 async def autopost_old(client, message):
-
-    await message.reply("🚀 Auto-posting old videos started...")
+    await message.reply("🚀 Auto-post started safely...")
 
     last_id = load_last_id()
-    messages = []
+    posted = 0
 
-    # 1️⃣ Fetch history (newest → oldest)
-    async for msg in client.get_chat_history(
-        chat_id=SOURCE_CHANNEL,
-        offset_id=last_id
-    ):
-        if msg.video:
-            messages.append(msg)
-
-    # 2️⃣ Reverse → oldest → newest
-    messages.reverse()
-
-    for msg in messages:
+    while True:
         try:
-            # 3️⃣ Copy video to DB channel
-            stored = await msg.copy(
-                chat_id=client.db_channel.id,
-                disable_notification=True
-            )
+            ids = list(range(last_id, last_id + BATCH_SIZE))
+            messages = await client.get_messages(SOURCE_CHANNEL, ids)
 
-            # 4️⃣ Generate FileStore link
-            key = f"get-{stored.id * abs(client.db_channel.id)}"
-            base64 = await encode(key)
-            link = f"https://t.me/{client.username}?start={base64}"
+            video_msgs = [m for m in messages if m and m.video]
 
-            caption = (
-                "🎬 <b>New Video Uploaded</b>\n\n"
-                f"🔗 <a href='{link}'>Watch / Download</a>"
-            )
+            if not video_msgs:
+                break
 
-            # 5️⃣ Download thumbnail safely (Pyrogram universal)
-            thumb_path = None
-            if msg.video.thumbs:
-                thumb_file_id = msg.video.thumbs[0].file_id
-                thumb_path = await client.download_media(thumb_file_id)
+            for msg in video_msgs:
+                try:
+                    # 1️⃣ Copy video to DB channel
+                    stored = await msg.copy(
+                        chat_id=client.db_channel.id,
+                        disable_notification=True
+                    )
 
-            # 6️⃣ Send thumbnail + link post
-            if thumb_path:
-                await client.send_photo(
-                    chat_id=TARGET_CHANNEL,
-                    photo=thumb_path,
-                    caption=caption,
-                    parse_mode="html"
-                )
-            else:
-                # Fallback if no thumbnail exists
-                await client.send_message(
-                    chat_id=TARGET_CHANNEL,
-                    text=caption,
-                    parse_mode="html"
-                )
+                    # 2️⃣ Generate FileStore link
+                    key = f"get-{stored.id * abs(client.db_channel.id)}"
+                    base64 = await encode(key)
+                    link = f"https://t.me/{client.username}?start={base64}"
 
-            # 7️⃣ Cleanup
-            if thumb_path and os.path.exists(thumb_path):
-                os.remove(thumb_path)
+                    caption = (
+                        "🎬 <b>New Video Uploaded</b>\n\n"
+                        f"🔗 <a href='{link}'>Watch / Download</a>"
+                    )
 
-            save_last_id(msg.id)
-            await asyncio.sleep(AUTO_POST_DELAY)
+                    # 3️⃣ Handle thumbnail safely
+                    thumb_path = None
+                    if msg.video.thumbs:
+                        thumb_path = await client.download_media(
+                            msg.video.thumbs[0].file_id
+                        )
+
+                    # 4️⃣ Send post to TARGET channel
+                    if thumb_path:
+                        await client.send_photo(
+                            chat_id=TARGET_CHANNEL,
+                            photo=thumb_path,
+                            caption=caption,
+                            parse_mode="html"
+                        )
+                        os.remove(thumb_path)
+                    else:
+                        await client.send_message(
+                            chat_id=TARGET_CHANNEL,
+                            text=caption,
+                            parse_mode="html"
+                        )
+
+                    save_last_id(msg.id)
+                    posted += 1
+                    await asyncio.sleep(AUTO_POST_DELAY)
+
+                except Exception as e:
+                    await message.reply(f"⚠ Skipped ID {msg.id}\n<code>{e}</code>")
+                    continue
+
+            last_id += BATCH_SIZE
 
         except Exception as e:
-            await message.reply(f"❌ Error:\n<code>{e}</code>")
-            return
+            await message.reply(f"❌ Stopped:\n<code>{e}</code>")
+            break
 
-    await message.reply("✅ Auto-posting completed successfully.")
+    await message.reply(f"✅ Auto-post finished.\n📤 Posted: {posted}")
