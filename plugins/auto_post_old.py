@@ -1,11 +1,14 @@
+# (©) Codeflix-Bots | Auto Post Old Videos (Thumbnail + FileStore Link)
+
 import asyncio
+import os
 from pyrogram import filters
 from bot import Bot
 from helper_func import encode
 from config import SOURCE_CHANNEL, TARGET_CHANNEL, AUTO_POST_DELAY
 
 PROGRESS_FILE = "autopost_progress.txt"
-BATCH_SIZE = 50  # safe limit
+BATCH_SIZE = 30  # keep low for safety
 
 
 def load_last_id():
@@ -24,32 +27,31 @@ def save_last_id(msg_id):
 @Bot.on_message(filters.private & filters.command("autopost_old"))
 async def autopost_old(client, message):
 
-    await message.reply("🚀 Auto-posting old videos started...")
+    await message.reply("🚀 Auto-posting old videos (thumbnail + link)...")
 
-    last_id = load_last_id()
-    current_id = last_id
+    current_id = load_last_id()
 
     while True:
-        try:
-            # ✅ BOT-SAFE message fetch
-            ids = list(range(current_id, current_id + BATCH_SIZE))
-            messages = await client.get_messages(SOURCE_CHANNEL, ids)
+        ids = list(range(current_id, current_id + BATCH_SIZE))
+        messages = await client.get_messages(SOURCE_CHANNEL, ids)
 
-            if not messages:
-                break
+        if not messages:
+            break
 
-            for msg in messages:
-                if not msg or not msg.video:
-                    current_id += 1
-                    continue
+        for msg in messages:
+            current_id += 1
 
-                # 1️⃣ Copy to DB Channel
+            if not msg or not msg.video:
+                continue
+
+            try:
+                # 1️⃣ Copy video to DB channel (FileStore storage)
                 stored = await msg.copy(
                     chat_id=client.db_channel.id,
                     disable_notification=True
                 )
 
-                # 2️⃣ Generate FileStore link (ORIGINAL LOGIC)
+                # 2️⃣ Generate FileStore bot link (ORIGINAL logic)
                 key = f"get-{stored.id * abs(client.db_channel.id)}"
                 base64 = await encode(key)
                 link = f"https://t.me/{client.username}?start={base64}"
@@ -59,25 +61,26 @@ async def autopost_old(client, message):
                     f"🔗 <a href='{link}'>Watch / Download</a>"
                 )
 
-                thumb = (
-                    msg.video.thumbs[0].file_id
-                    if msg.video.thumbs else None
-                )
+                # 3️⃣ Download thumbnail (CRITICAL STEP)
+                thumb_path = await msg.video.download_thumb()
 
-                # 3️⃣ Post to target channel
+                # 4️⃣ Send thumbnail + caption to target channel
                 await client.send_photo(
                     chat_id=TARGET_CHANNEL,
-                    photo=thumb,
+                    photo=thumb_path,
                     caption=caption,
                     parse_mode="html"
                 )
 
+                # 5️⃣ Cleanup
+                if thumb_path and os.path.exists(thumb_path):
+                    os.remove(thumb_path)
+
                 save_last_id(msg.id)
-                current_id += 1
                 await asyncio.sleep(AUTO_POST_DELAY)
 
-        except Exception as e:
-            await message.reply(f"❌ Error:\n<code>{e}</code>")
-            return
+            except Exception as e:
+                await message.reply(f"❌ Error:\n<code>{e}</code>")
+                return
 
-    await message.reply("✅ Auto-posting completed successfully.")
+    await message.reply("✅ Auto-posting completed.")
