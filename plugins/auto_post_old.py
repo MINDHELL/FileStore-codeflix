@@ -127,7 +127,8 @@ async def autopost_old(client, message):
                 link = f"https://t.me/{client.username}?start={token}"
 
                 caption = (
-                    "🎬 <b>New Video Uploaded</b>\n\n"
+                    "🎬 <b>❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</b>\n\n"
+                    "🎬 <b>Must Join @Allvidsbackup3</b>\n\n"
                     f"🔗 <a href='{link}'>Watch / Download</a>"
                 )
 
