@@ -5,7 +5,8 @@ from pyrogram import filters
 from bot import Bot
 from helper_func import encode
 from config import SOURCE_CHANNEL, TARGET_CHANNEL, AUTO_POST_DELAY, OWNER_ID
-from database import db
+from database.database import *
+
 
 BATCH_SIZE = 20
 STOP_FLAG = False
