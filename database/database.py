@@ -212,6 +212,42 @@ class Rohit:
             return False
 
 
+    # ================= AUTO POST PROGRESS =================
+
+async def get_autopost_progress(self):
+    data = await self.database['autopost'].find_one({'_id': 'progress'})
+    return data['last_id'] if data else 1
+
+
+async def set_autopost_progress(self, last_id: int):
+    await self.database['autopost'].update_one(
+        {'_id': 'progress'},
+        {'$set': {'last_id': last_id}},
+        upsert=True
+    )
+
+
+async def is_video_posted(self, msg_id: int):
+    return bool(
+        await self.database['posted_videos'].find_one({'_id': msg_id})
+    )
+
+
+async def mark_video_posted(self, msg_id: int):
+    await self.database['posted_videos'].update_one(
+        {'_id': msg_id},
+        {'$set': {'posted': True}},
+        upsert=True
+    )
+
+
+async def reset_autopost(self):
+    await self.database['autopost'].delete_many({})
+    await self.database['posted_videos'].delete_many({})
+
+    
+
+
 
     # VERIFICATION MANAGEMENT
     async def db_verify_status(self, user_id):
