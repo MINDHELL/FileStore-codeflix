@@ -101,7 +101,7 @@ async def autopost_old(client, message):
     found_video = False
 
     no_video_streak = 0          # 🔑 IMPORTANT
-    MAX_NO_VIDEO = 1             # stop after 3 empty IDs
+    MAX_NO_VIDEO = 2             # stop after 3 empty IDs
 
     status = await message.reply(
         f"🚀 Auto-post started\n"
