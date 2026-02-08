@@ -1,13 +1,24 @@
-# (©) Codeflix-Bots | Auto Post Old Videos (FINAL • MONGO • SMART STOP)
+# (©) Codeflix-Bots | Auto Post Old Videos + Delayed Forward (FINAL)
 
 import asyncio
+import time
 from pyrogram import filters
 from bot import Bot
 from helper_func import encode
-from config import (SOURCE_CHANNEL,TARGET_CHANNEL,AUTO_POST_DELAY,OWNER_ID,DB_URI,DB_NAME)
+from config import (
+    SOURCE_CHANNEL,
+    TARGET_CHANNEL,
+    TARGET_CHANNEL_2,
+    AUTO_POST_DELAY,
+    DELAY_SECONDS,
+    OWNER_ID,
+    DB_URI,
+    DB_NAME
+)
+
 import motor.motor_asyncio
 
-# ===================== MONGO SETUP =====================
+# ===================== MONGO =====================
 
 mongo = motor.motor_asyncio.AsyncIOMotorClient(DB_URI)
 db = mongo[DB_NAME]
@@ -15,89 +26,75 @@ db = mongo[DB_NAME]
 progress_col = db["autopost_progress"]
 posted_col   = db["autopost_posted"]
 control_col  = db["autopost_control"]
-
+queue_col    = db["target2_queue"]
 
 # ===================== HELPERS =====================
 
 async def get_last_id():
-    data = await progress_col.find_one({"_id": "progress"})
-    return data["last_id"] if data else 1
+    d = await progress_col.find_one({"_id": "progress"})
+    return d["last_id"] if d else 1
 
-
-async def set_last_id(msg_id: int):
+async def set_last_id(i):
     await progress_col.update_one(
         {"_id": "progress"},
-        {"$set": {"last_id": msg_id}},
+        {"$set": {"last_id": i}},
         upsert=True
     )
-
 
 async def stop_requested():
     return await control_col.find_one({"_id": "stop"}) is not None
 
-
 async def request_stop():
     await control_col.update_one(
         {"_id": "stop"},
-        {"$set": {"value": True}},
+        {"$set": {"v": True}},
         upsert=True
     )
-
 
 async def clear_stop():
     await control_col.delete_one({"_id": "stop"})
 
-
-# 🔒 Atomic duplicate protection
-async def try_mark_posted(msg_id: int) -> bool:
+async def try_mark_posted(msg_id):
     try:
         await posted_col.insert_one({"_id": msg_id})
         return True
     except:
         return False
 
-
-# ===================== ADMIN COMMANDS =====================
+# ===================== ADMIN =====================
 
 @Bot.on_message(filters.private & filters.command("stop_autopost") & filters.user(OWNER_ID))
-async def stop_autopost(_, message):
+async def stop_autopost(_, m):
     await request_stop()
-    await message.reply("🛑 Auto-post stopped.")
-
+    await m.reply("🛑 Auto-post stopped.")
 
 @Bot.on_message(filters.private & filters.command("reset_autopost") & filters.user(OWNER_ID))
-async def reset_autopost(_, message):
+async def reset_autopost(_, m):
     await progress_col.delete_many({})
     await posted_col.delete_many({})
     await control_col.delete_many({})
-    await message.reply(
-        "♻️ Auto-post RESET\n\n"
-        "▶️ Progress cleared\n"
-        "▶️ Duplicate cache cleared\n"
-        "▶️ Will start from FIRST message"
-    )
+    await queue_col.delete_many({})
+    await m.reply("♻️ Auto-post + queue RESET")
 
-
-# ===================== AUTO POST =====================
+# ===================== AUTOPOST =====================
 
 @Bot.on_message(filters.private & filters.command("autopost_old") & filters.user(OWNER_ID))
 async def autopost_old(client, message):
 
     await clear_stop()
 
-    last_posted_id = await get_last_id()
-    current_id = last_posted_id + 1
+    start = await get_last_id()
+    current = start
 
     posted = 0
     checked = 0
     found_video = False
 
     no_video_streak = 0
-    MAX_NO_VIDEO = 4   # ⬅️ safe value
+    MAX_NO_VIDEO = 3
 
     status = await message.reply(
-        f"🚀 Auto-post started\n"
-        f"▶️ From Message ID: {current_id}"
+        f"🚀 Auto-post started\n▶️ From Message ID: {start}"
     )
 
     while True:
@@ -106,36 +103,28 @@ async def autopost_old(client, message):
             break
 
         try:
-            msg = await client.get_messages(SOURCE_CHANNEL, current_id)
+            msg = await client.get_messages(SOURCE_CHANNEL, current)
         except:
             break
 
-        checked += 1
-
         if not msg:
-            no_video_streak += 1
-            current_id += 1
-            if no_video_streak >= MAX_NO_VIDEO:
-                break
-            continue
+            break
 
-        # ❌ No video
+        checked += 1
+        await set_last_id(current)
+
         if not msg.video:
             no_video_streak += 1
-            current_id += 1
-
+            current += 1
             if no_video_streak >= MAX_NO_VIDEO:
                 break
-
             continue
 
-        # ✅ Video found
         no_video_streak = 0
         found_video = True
 
-        # 🔒 Already posted
         if not await try_mark_posted(msg.id):
-            current_id += 1
+            current += 1
             continue
 
         try:
@@ -155,43 +144,66 @@ async def autopost_old(client, message):
                 thumb = await client.download_media(msg.video.thumbs[0].file_id)
 
             if thumb:
-                await client.send_photo(TARGET_CHANNEL, thumb, caption)
+                sent = await client.send_photo(TARGET_CHANNEL, thumb, caption)
             else:
-                await client.send_message(TARGET_CHANNEL, caption)
+                sent = await client.send_message(TARGET_CHANNEL, caption)
+
+            # ➕ ADD TO TARGET-2 QUEUE
+            await queue_col.insert_one({
+                "_id": sent.id,
+                "from_chat": TARGET_CHANNEL,
+                "time": time.time()
+            })
 
             posted += 1
-
-            # ✅ SAVE PROGRESS ONLY AFTER SUCCESS
-            await set_last_id(msg.id)
-
-            if posted % 5 == 0:
-                await status.edit(
-                    f"🚀 Posting...\n"
-                    f"📤 Posted: {posted}\n"
-                    f"🆔 Last Video ID: {msg.id}"
-                )
-
+            current += 1
             await asyncio.sleep(AUTO_POST_DELAY)
 
         except:
-            current_id += 1
+            current += 1
             continue
-
-        current_id += 1
 
     await clear_stop()
 
-    # ===================== FINAL MESSAGE =====================
-
     if not found_video:
-        await status.edit(
-            "✅ Auto-post completed\n\n"
-            "📭 No videos found."
-        )
+        await status.edit("✅ Auto-post completed\n📭 No videos found.")
     else:
         await status.edit(
-            f"✅ Auto-post completed successfully\n\n"
-            f"📤 New Videos Posted: {posted}\n"
-            f"🔎 Messages Checked: {checked}\n"
-            f"🆔 Last Video ID: {await get_last_id()}"
-               )
+            f"✅ Auto-post completed\n\n"
+            f"📤 Posted: {posted}\n"
+            f"🔎 Checked: {checked}\n"
+            f"🆔 Last ID: {await get_last_id()}"
+        )
+
+# ===================== TARGET-2 WORKER =====================
+
+async def target2_worker(client):
+    await asyncio.sleep(5)
+
+    while True:
+        doc = await queue_col.find_one({}, sort=[("time", 1)])
+        if not doc:
+            await asyncio.sleep(10)
+            continue
+
+        wait = (doc["time"] + DELAY_SECONDS) - time.time()
+        if wait > 0:
+            await asyncio.sleep(wait)
+
+        try:
+            msg = await client.get_messages(doc["from_chat"], doc["_id"])
+            if msg:
+                await msg.copy(TARGET_CHANNEL_2)
+        except:
+            pass
+
+        await queue_col.delete_one({"_id": doc["_id"]})
+        await asyncio.sleep(2)
+
+# ===================== START WORKER =====================
+
+@Bot.on_message(filters.command("start"))
+async def _start(_, __):
+    pass
+
+Bot.add_task(target2_worker)
