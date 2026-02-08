@@ -31,6 +31,10 @@ PORT = os.environ.get("PORT", "8001")
 SOURCE_CHANNEL = -1003892719753   # your source channel ID
 TARGET_CHANNEL = -1003861148198   # your target channel ID
 AUTO_POST_DELAY = 10             # 5 minutes (safe)
+#for target 2 channel automatic work best..
+
+TARGET_CHANNEL_2 = -100xxxxxxxxxx  # second channel
+DELAY_SECONDS = 1800               # 1800 = 30 min, 3600 = 1 hour
 
 #--------------------------------------------
 DB_URI = os.environ.get("DATABASE_URL", "mongodb+srv://aarshhub:wcCgmKoCu2sTsEtv@cluster0.6shiu.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
