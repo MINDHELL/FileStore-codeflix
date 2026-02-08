@@ -4,15 +4,7 @@ import asyncio
 from pyrogram import filters
 from bot import Bot
 from helper_func import encode
-from config import (
-    SOURCE_CHANNEL,
-    TARGET_CHANNEL,
-    AUTO_POST_DELAY,
-    OWNER_ID,
-    DB_URI,
-    DB_NAME
-)
-
+from config import (SOURCE_CHANNEL,TARGET_CHANNEL,AUTO_POST_DELAY,OWNER_ID,DB_URI,DB_NAME)
 import motor.motor_asyncio
 
 # ===================== MONGO SETUP =====================
@@ -56,7 +48,7 @@ async def clear_stop():
     await control_col.delete_one({"_id": "stop"})
 
 
-# 🔒 Prevent duplicate posts (atomic)
+# 🔒 Atomic duplicate protection
 async def try_mark_posted(msg_id: int) -> bool:
     try:
         await posted_col.insert_one({"_id": msg_id})
@@ -93,19 +85,19 @@ async def autopost_old(client, message):
 
     await clear_stop()
 
-    start_id = await get_last_id()
-    current_id = start_id
+    last_posted_id = await get_last_id()
+    current_id = last_posted_id + 1
 
     posted = 0
     checked = 0
     found_video = False
 
-    no_video_streak = 0          # 🔑 IMPORTANT
-    MAX_NO_VIDEO = 2             # stop after 3 empty IDs
+    no_video_streak = 0
+    MAX_NO_VIDEO = 4   # ⬅️ safe value
 
     status = await message.reply(
         f"🚀 Auto-post started\n"
-        f"▶️ From Message ID: {start_id}"
+        f"▶️ From Message ID: {current_id}"
     )
 
     while True:
@@ -118,13 +110,16 @@ async def autopost_old(client, message):
         except:
             break
 
-        if not msg:
-            break
-
         checked += 1
-        await set_last_id(current_id)
 
-        # ❌ NO VIDEO
+        if not msg:
+            no_video_streak += 1
+            current_id += 1
+            if no_video_streak >= MAX_NO_VIDEO:
+                break
+            continue
+
+        # ❌ No video
         if not msg.video:
             no_video_streak += 1
             current_id += 1
@@ -134,11 +129,11 @@ async def autopost_old(client, message):
 
             continue
 
-        # ✅ VIDEO FOUND → RESET STREAK
+        # ✅ Video found
         no_video_streak = 0
         found_video = True
 
-        # 🔒 Skip if already posted
+        # 🔒 Already posted
         if not await try_mark_posted(msg.id):
             current_id += 1
             continue
@@ -165,13 +160,15 @@ async def autopost_old(client, message):
                 await client.send_message(TARGET_CHANNEL, caption)
 
             posted += 1
-            current_id += 1
+
+            # ✅ SAVE PROGRESS ONLY AFTER SUCCESS
+            await set_last_id(msg.id)
 
             if posted % 5 == 0:
                 await status.edit(
                     f"🚀 Posting...\n"
                     f"📤 Posted: {posted}\n"
-                    f"🆔 Last ID: {msg.id}"
+                    f"🆔 Last Video ID: {msg.id}"
                 )
 
             await asyncio.sleep(AUTO_POST_DELAY)
@@ -179,6 +176,8 @@ async def autopost_old(client, message):
         except:
             current_id += 1
             continue
+
+        current_id += 1
 
     await clear_stop()
 
@@ -194,5 +193,5 @@ async def autopost_old(client, message):
             f"✅ Auto-post completed successfully\n\n"
             f"📤 New Videos Posted: {posted}\n"
             f"🔎 Messages Checked: {checked}\n"
-            f"🆔 Last Message ID: {await get_last_id()}"
-)
+            f"🆔 Last Video ID: {await get_last_id()}"
+               )
