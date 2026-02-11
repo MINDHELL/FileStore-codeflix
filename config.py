@@ -28,10 +28,10 @@ OWNER = os.environ.get("OWNER", "Xsupprt4bot") # Owner username without @
 OWNER_ID = int(os.environ.get("OWNER_ID", "7437503888")) # Owner id
 #--------------------------------------------
 PORT = os.environ.get("PORT", "8001")
-SOURCE_CHANNEL = -1003892719753   # your source channel ID
-TARGET_CHANNEL = -1003861148198   # your target channel ID
+SOURCE_CHANNEL = -1003701036114   # your source channel ID
+TARGET_CHANNEL = -1003798771315   # your target channel ID
 AUTO_POST_DELAY = 20             # 5 minutes (safe)
-TARGET2_CHANNEL = -1003871231590  # second channel
+TARGET2_CHANNEL = -1003553308072  # second channel
 DELAY_SECONDS = 1800               # 1800 = 30 min, 3600 = 1 hour
 
 #--------------------------------------------
