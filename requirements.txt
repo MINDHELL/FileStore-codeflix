@@ -19,3 +19,5 @@ bs4
 shortzy
 aiofiles
 asyncio
+mega.py
+pyrogram
