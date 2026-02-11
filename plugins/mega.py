@@ -1,3 +1,4 @@
+print("Mega plugin loaded successfully")
 import os
 import asyncio
 import shutil
@@ -110,6 +111,8 @@ async def mega_handler(client: Client, message: Message):
 
     finally:
         cleanup(user_dir)
+
+print("Mega handler triggered")
 
 
 # ============ RUN ============ #
