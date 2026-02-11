@@ -113,5 +113,3 @@ async def mega_handler(client: Client, message: Message):
 
 
 # ============ RUN ============ #
-
-app.run()
