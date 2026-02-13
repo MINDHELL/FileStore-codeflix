@@ -71,22 +71,26 @@ async def start_command(client: Client, message: Message):
 
 
     text = message.text
-    if len(text) > 7:
-        # Token verification 
-        verify_status = await db.get_verify_status(id)
+if len(text) > 7:
+    # Token verification 
+    verify_status = await db.get_verify_status(id)
 
-        if SHORTLINK_URL or SHORTLINK_API:
-            if verify_status['is_verified'] and VERIFY_EXPIRE < (time.time() - verify_status['verified_time']):
-                await db.update_verify_status(user_id, is_verified=False)
+    if SHORTLINK_URL or SHORTLINK_API:
 
-            if "verify_" in message.text:
-    _, token = message.text.split("_", 1)
+        if verify_status['is_verified'] and VERIFY_EXPIRE < (time.time() - verify_status['verified_time']):
+            await db.update_verify_status(user_id, is_verified=False)
 
-    if verify_status['verify_token'] != token:
-        return await message.reply("⚠️ Invalid token. Please /start again.")
+        if "verify_" in message.text:
+            _, token = message.text.split("_", 1)
 
-    current_time = time.time()
-    token_created_at = verify_status.get("token_created_at", 0)
+            if verify_status['verify_token'] != token:
+                return await message.reply("⚠️ Invalid token. Please /start again.")
+
+            current_time = time.time()
+            token_created_at = verify_status.get("token_created_at", 0)
+
+
+    
 
     # 🔴 BYPASS DETECTION (Too Fast)
     if current_time - token_created_at < MIN_VERIFY_TIME:
