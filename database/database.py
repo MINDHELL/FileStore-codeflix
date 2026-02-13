@@ -19,7 +19,7 @@ default_verify = {
     'verified_time': 0,
     'verify_token': "",
     'link': "",
-    'token_created_at': 0   # ✅ added
+    'token_created_at': 0
 }
 
 
