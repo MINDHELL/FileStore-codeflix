@@ -27,11 +27,11 @@ def new_user(id):
     return {
         '_id': id,
         'verify_status': {
-            'is_verified': False,
-            'verified_time': 0,
-            'verify_token': "",
-            'link': ""
-            'token_created_at': 0
+    'is_verified': False,
+    'verified_time': 0,
+    'verify_token': "",
+    'link': "",
+    'token_created_at': 0
         }
     }
 
