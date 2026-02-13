@@ -33,6 +33,9 @@ from database.db_premium import *
 
 BAN_SUPPORT = f"{BAN_SUPPORT}"
 TUT_VID = f"{TUT_VID}"
+MIN_VERIFY_TIME = 60  # seconds (anti-bypass protection)
+MAX_VERIFY_TIME = 600  # optional: token expires after 10 minutes
+
 
 @Bot.on_message(filters.command('start') & filters.private)
 async def start_command(client: Client, message: Message):
@@ -77,29 +80,80 @@ async def start_command(client: Client, message: Message):
                 await db.update_verify_status(user_id, is_verified=False)
 
             if "verify_" in message.text:
-                _, token = message.text.split("_", 1)
-                if verify_status['verify_token'] != token:
-                    return await message.reply("⚠️ 𝖨𝗇𝗏𝖺𝗅𝗂𝖽 𝗍𝗈𝗄𝖾𝗇. 𝖯𝗅𝖾𝖺𝗌𝖾 /start 𝖺𝗀𝖺𝗂𝗇.")
+    _, token = message.text.split("_", 1)
 
-                await db.update_verify_status(id, is_verified=True, verified_time=time.time())
-                current = await db.get_verify_count(id)
-                await db.set_verify_count(id, current + 1)
-                return await message.reply(
-                    f"✅ 𝗧𝗼𝗸𝗲𝗻 𝘃𝗲𝗿𝗶𝗳𝗶𝗲𝗱! Vᴀʟɪᴅ ғᴏʀ {get_exp_time(VERIFY_EXPIRE)}"
-                )
+    if verify_status['verify_token'] != token:
+        return await message.reply("⚠️ Invalid token. Please /start again.")
 
-            if not verify_status['is_verified'] and not is_premium:
-                token = ''.join(random.choices(rohit.ascii_letters + rohit.digits, k=10))
-                await db.update_verify_status(id, verify_token=token, link="")
-                link = await get_shortlink(SHORTLINK_URL, SHORTLINK_API, f'https://telegram.dog/{client.username}?start=verify_{token}')
-                btn = [
-                    [InlineKeyboardButton("• ᴏᴘᴇɴ ʟɪɴᴋ •", url=link),
-                     InlineKeyboardButton("• ᴛᴜᴛᴏʀɪᴀʟ •", url=TUT_VID)],
-                    [InlineKeyboardButton("• ʙᴜʏ ᴘʀᴇᴍɪᴜᴍ •", callback_data="premium")]
-                ]
-                return await message.reply(
-                    f"𝗬𝗼𝘂𝗿 𝘁𝗼𝗸𝗲𝗻 𝗵𝗮𝘀 𝗲𝘅𝗽𝗶𝗿𝗲𝗱. 𝗣𝗹𝗲𝗮𝘀𝗲 𝗿𝗲𝗳𝗿𝗲𝘀𝗵 𝘆𝗼𝘂𝗿 𝘁𝗼𝗸𝗲𝗻 𝘁𝗼 𝗰𝗼𝗻𝘁𝗶𝗻𝘂𝗲..\n\n<b>Tᴏᴋᴇɴ Tɪᴍᴇᴏᴜᴛ:</b> {get_exp_time(VERIFY_EXPIRE)}\n\n<b>ᴡʜᴀᴛ ɪs ᴛʜᴇ ᴛᴏᴋᴇɴ??</b>\n\nᴛʜɪs ɪs ᴀɴ ᴀᴅs ᴛᴏᴋᴇɴ. ᴘᴀssɪɴɢ ᴏɴᴇ ᴀᴅ ᴀʟʟᴏᴡs ʏᴏᴜ ᴛᴏ ᴜsᴇ ᴛʜᴇ ʙᴏᴛ ғᴏʀ {get_exp_time(VERIFY_EXPIRE)}</b>",                    reply_markup=InlineKeyboardMarkup(btn)
-                )
+    current_time = time.time()
+    token_created_at = verify_status.get("token_created_at", 0)
+
+    # 🔴 BYPASS DETECTION (Too Fast)
+    if current_time - token_created_at < MIN_VERIFY_TIME:
+        await db.update_verify_status(id, is_verified=False)
+        return await message.reply(
+            "🚫 Bypass Detected!\n\n"
+            "Please complete the shortlink properly.\n"
+            "Do not use bypass tools."
+        )
+
+    # 🔴 Token Expired (Too Late)
+    if current_time - token_created_at > MAX_VERIFY_TIME:
+        await db.update_verify_status(id, is_verified=False)
+        return await message.reply(
+            "⚠️ Token expired. Please generate a new verification link."
+        )
+
+    # ✅ Normal verification
+    await db.update_verify_status(
+    id,
+    is_verified=True,
+    verified_time=current_time
+)
+
+current = await db.get_verify_count(id)
+await db.set_verify_count(id, current + 1)
+
+return await message.reply(
+    f"✅ Token verified! Valid for {get_exp_time(VERIFY_EXPIRE)}"
+)
+
+
+if not verify_status['is_verified'] and not is_premium:
+    token = ''.join(random.choices(rohit.ascii_letters + rohit.digits, k=10))
+
+    await db.update_verify_status(
+        id,
+        verify_token=token,
+        link="",
+        is_verified=False,
+        token_created_at=time.time()  # ✅ store creation time
+    )
+
+    link = await get_shortlink(
+        SHORTLINK_URL,
+        SHORTLINK_API,
+        f'https://telegram.dog/{client.username}?start=verify_{token}'
+    )
+
+    btn = [
+        [
+            InlineKeyboardButton("• ᴏᴘᴇɴ ʟɪɴᴋ •", url=link),
+            InlineKeyboardButton("• ᴛᴜᴛᴏʀɪᴀʟ •", url=TUT_VID)
+        ],
+        [
+            InlineKeyboardButton("• ʙᴜʏ ᴘʀᴇᴍɪᴜᴍ •", callback_data="premium")
+        ]
+    ]
+
+    return await message.reply(
+        f"𝗬𝗼𝘂𝗿 𝘁𝗼𝗸𝗲𝗻 𝗵𝗮𝘀 𝗲𝘅𝗽𝗶𝗿𝗲𝗱. 𝗣𝗹𝗲𝗮𝘀𝗲 𝗿𝗲𝗳𝗿𝗲𝘀𝗵 𝘆𝗼𝘂𝗿 𝘁𝗼𝗸𝗲𝗻 𝘁𝗼 𝗰𝗼𝗻𝘁𝗶𝗻𝘂𝗲..\n\n"
+        f"<b>Tᴏᴋᴇɴ Tɪᴍᴇᴏᴜᴛ:</b> {get_exp_time(VERIFY_EXPIRE)}\n\n"
+        f"<b>ᴡʜᴀᴛ ɪs ᴛʜᴇ ᴛᴏᴋᴇɴ??</b>\n\n"
+        f"ᴛʜɪs ɪs ᴀɴ ᴀᴅs ᴛᴏᴋᴇɴ. ᴘᴀssɪɴɢ ᴏɴᴇ ᴀᴅ ᴀʟʟᴏᴡs ʏᴏᴜ ᴛᴏ ᴜsᴇ ᴛʜᴇ ʙᴏᴛ ғᴏʀ {get_exp_time(VERIFY_EXPIRE)}",
+        reply_markup=InlineKeyboardMarkup(btn)
+)
+    
 
         try:
             base64_string = text.split(" ", 1)[1]
