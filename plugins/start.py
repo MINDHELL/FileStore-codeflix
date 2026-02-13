@@ -70,58 +70,63 @@ async def start_command(client: Client, message: Message):
  # File auto-delete time in seconds (Set your desired time in seconds here)
     FILE_AUTO_DELETE = await db.get_del_timer()  # Example: 3600 seconds (1 hour)
 
-    text = message.text
-    if len(text) > 7:
-        # Token verification
-        verify_status = await db.get_verify_status(id)
+text = message.text
+if len(text) > 7:
 
-        if SHORTLINK_URL or SHORTLINK_API:
+    # Token verification
+    verify_status = await db.get_verify_status(id)
 
-            if verify_status['is_verified'] and VERIFY_EXPIRE < (time.time() - verify_status['verified_time']):
-                await db.update_verify_status(user_id, is_verified=False)
+    if SHORTLINK_URL or SHORTLINK_API:
 
-            if "verify_" in message.text:
-                _, token = message.text.split("_", 1)
+        # Expire old verification
+        if (
+            verify_status['is_verified'] and
+            VERIFY_EXPIRE < (time.time() - verify_status['verified_time'])
+        ):
+            await db.update_verify_status(user_id, is_verified=False)
 
-                if verify_status['verify_token'] != token:
-                    return await message.reply("⚠️ Invalid token. Please /start again.")
+        if "verify_" in message.text:
+            _, token = message.text.split("_", 1)
 
-                current_time = time.time()
-                token_created_at = verify_status.get("token_created_at", 0)
+            if verify_status['verify_token'] != token:
+                return await message.reply("⚠️ Invalid token. Please /start again.")
 
-                # 🔴 BYPASS DETECTION (Too Fast)
-                if current_time - token_created_at < MIN_VERIFY_TIME:
-    await db.update_verify_status(id, is_verified=False)
+            current_time = time.time()
+            token_created_at = verify_status.get("token_created_at", 0)
 
-    time_taken = round(current_time - token_created_at, 2)
+            # 🔴 BYPASS DETECTION (Too Fast)
+            if current_time - token_created_at < MIN_VERIFY_TIME:
 
-    # 🚨 Send alert to owner
-    try:
-        await bot.send_message(
-            OWNER_ID,
-            f"🚨 BYPASS ATTEMPT DETECTED!\n\n"
-            f"👤 User: {message.from_user.first_name}\n"
-            f"🆔 ID: {message.from_user.id}\n"
-            f"🔗 Username: @{message.from_user.username}\n"
-            f"⏱ Time Taken: {time_taken} seconds\n\n"
-            f"Token: {token}"
-        )
-    except:
-        pass
+                await db.update_verify_status(id, is_verified=False)
 
-    return await message.reply(
-        "🚫 Bypass Detected!\n\n"
-        "Please complete the shortlink properly.\n"
-        "Do not use bypass tools."
-    )
+                time_taken = round(current_time - token_created_at, 2)
 
-    
-                # 🔴 Token Expired (Too Late)
-                if current_time - token_created_at > MAX_VERIFY_TIME:
-                    await db.update_verify_status(id, is_verified=False)
-                    return await message.reply(
-                        "⚠️ Token expired. Please generate a new verification link."
+                # 🚨 Send alert to owner
+                try:
+                    await bot.send_message(
+                        OWNER_ID,
+                        f"🚨 BYPASS ATTEMPT DETECTED!\n\n"
+                        f"👤 User: {message.from_user.first_name}\n"
+                        f"🆔 ID: {message.from_user.id}\n"
+                        f"🔗 Username: @{message.from_user.username}\n"
+                        f"⏱ Time Taken: {time_taken} seconds\n\n"
+                        f"Token: {token}"
                     )
+                except Exception:
+                    pass
+
+                return await message.reply(
+                    "🚫 Bypass Detected!\n\n"
+                    "Please complete the shortlink properly.\n"
+                    "Do not use bypass tools."
+                )
+
+            # 🔴 Token Expired (Too Late)
+            if current_time - token_created_at > MAX_VERIFY_TIME:
+                await db.update_verify_status(id, is_verified=False)
+                return await message.reply(
+                    "⚠️ Token expired. Please generate a new verification link."
+                )
 
                 # ✅ Normal verification
                 await db.update_verify_status(
