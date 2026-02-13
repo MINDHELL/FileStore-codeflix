@@ -91,13 +91,31 @@ async def start_command(client: Client, message: Message):
 
                 # 🔴 BYPASS DETECTION (Too Fast)
                 if current_time - token_created_at < MIN_VERIFY_TIME:
-                    await db.update_verify_status(id, is_verified=False)
-                    return await message.reply(
-                        "🚫 Bypass Detected!\n\n"
-                        "Please complete the shortlink properly.\n"
-                        "Do not use bypass tools."
-                    )
+    await db.update_verify_status(id, is_verified=False)
 
+    time_taken = round(current_time - token_created_at, 2)
+
+    # 🚨 Send alert to owner
+    try:
+        await bot.send_message(
+            OWNER_ID,
+            f"🚨 BYPASS ATTEMPT DETECTED!\n\n"
+            f"👤 User: {message.from_user.first_name}\n"
+            f"🆔 ID: {message.from_user.id}\n"
+            f"🔗 Username: @{message.from_user.username}\n"
+            f"⏱ Time Taken: {time_taken} seconds\n\n"
+            f"Token: {token}"
+        )
+    except:
+        pass
+
+    return await message.reply(
+        "🚫 Bypass Detected!\n\n"
+        "Please complete the shortlink properly.\n"
+        "Do not use bypass tools."
+    )
+
+    
                 # 🔴 Token Expired (Too Late)
                 if current_time - token_created_at > MAX_VERIFY_TIME:
                     await db.update_verify_status(id, is_verified=False)
