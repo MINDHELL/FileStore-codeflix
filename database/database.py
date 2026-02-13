@@ -31,7 +31,7 @@ def new_user(id):
             'verified_time': 0,
             'verify_token': "",
             'link': ""
-            'token_created_at': 0   # ✅ added
+            'token_created_at': 0
         }
     }
 
