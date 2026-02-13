@@ -16,7 +16,6 @@ import random
 import sys
 import re
 import string 
-import string as rohit
 import time
 from datetime import datetime, timedelta
 from pyrogram import Client, filters, __version__
@@ -181,8 +180,8 @@ async def start_command(client: Client, message: Message):
         except IndexError:
             return
 
-        string = await decode(base64_string)
-        argument = string.split("-")
+        decoded_string = await decode(base64_string)
+        argument = decoded_string.split("-")
 
         ids = []
         if len(argument) == 3:
