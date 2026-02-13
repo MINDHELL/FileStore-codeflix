@@ -243,7 +243,7 @@ class Rohit:
 
     if verify_token is not None:
         current['verify_token'] = verify_token
-
+        
     if is_verified is not None:
         current['is_verified'] = is_verified
 
