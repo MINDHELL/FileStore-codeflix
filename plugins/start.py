@@ -39,23 +39,23 @@ MAX_VERIFY_TIME = 90  # optional: token expires after 10 minutes
 
 @Bot.on_message(filters.command('start') & filters.private)
 async def start_command(client: Client, message: Message):
+
     user_id = message.from_user.id
-    id = message.from_user.id
+    id = user_id
     is_premium = await is_premium_user(id)
 
     # Add user if not already present
     if not await db.present_user(user_id):
         try:
             await db.add_user(user_id)
-        except:
+        except Exception:
             pass
 
     # ✅ Check Force Subscription
     if not await is_subscribed(client, user_id):
-        #await temp.delete()
         return await not_joined(client, message)
 
-    # Check if user is banned
+    # ✅ Check if user is banned
     banned_users = await db.get_ban_users()
     if user_id in banned_users:
         return await message.reply_text(
@@ -66,69 +66,67 @@ async def start_command(client: Client, message: Message):
             )
         )
 
-    # File auto-delete time in seconds (Set your desired time in seconds here)
- # File auto-delete time in seconds (Set your desired time in seconds here)
-    FILE_AUTO_DELETE = await db.get_del_timer()  # Example: 3600 seconds (1 hour)
+    # ✅ File auto-delete timer
+    FILE_AUTO_DELETE = await db.get_del_timer()
 
-text = message.text
-if len(text) > 7:
+    text = message.text
 
-    # Token verification
-    verify_status = await db.get_verify_status(id)
+    if len(text) > 7:
 
-    if SHORTLINK_URL or SHORTLINK_API:
+        verify_status = await db.get_verify_status(id)
 
-        # Expire old verification
-        if (
-            verify_status['is_verified'] and
-            VERIFY_EXPIRE < (time.time() - verify_status['verified_time'])
-        ):
-            await db.update_verify_status(user_id, is_verified=False)
+        if SHORTLINK_URL or SHORTLINK_API:
 
-        if "verify_" in message.text:
-            _, token = message.text.split("_", 1)
+            # Expire old verification
+            if (
+                verify_status['is_verified']
+                and VERIFY_EXPIRE < (time.time() - verify_status['verified_time'])
+            ):
+                await db.update_verify_status(user_id, is_verified=False)
 
-            if verify_status['verify_token'] != token:
-                return await message.reply("⚠️ Invalid token. Please /start again.")
+            if "verify_" in text:
+                _, token = text.split("_", 1)
 
-            current_time = time.time()
-            token_created_at = verify_status.get("token_created_at", 0)
+                if verify_status['verify_token'] != token:
+                    return await message.reply("⚠️ Invalid token. Please /start again.")
 
-            # 🔴 BYPASS DETECTION (Too Fast)
-            if current_time - token_created_at < MIN_VERIFY_TIME:
+                current_time = time.time()
+                token_created_at = verify_status.get("token_created_at", 0)
 
-                await db.update_verify_status(id, is_verified=False)
+                # 🔴 BYPASS DETECTION
+                if current_time - token_created_at < MIN_VERIFY_TIME:
 
-                time_taken = round(current_time - token_created_at, 2)
+                    await db.update_verify_status(id, is_verified=False)
 
-                # 🚨 Send alert to owner
-                try:
-                    await bot.send_message(
-                        OWNER_ID,
-                        f"🚨 BYPASS ATTEMPT DETECTED!\n\n"
-                        f"👤 User: {message.from_user.first_name}\n"
-                        f"🆔 ID: {message.from_user.id}\n"
-                        f"🔗 Username: @{message.from_user.username}\n"
-                        f"⏱ Time Taken: {time_taken} seconds\n\n"
-                        f"Token: {token}"
+                    time_taken = round(current_time - token_created_at, 2)
+
+                    try:
+                        await client.send_message(
+                            OWNER_ID,
+                            f"🚨 BYPASS ATTEMPT DETECTED!\n\n"
+                            f"👤 User: {message.from_user.first_name}\n"
+                            f"🆔 ID: {message.from_user.id}\n"
+                            f"🔗 Username: @{message.from_user.username}\n"
+                            f"⏱ Time Taken: {time_taken} seconds\n\n"
+                            f"Token: {token}"
+                        )
+                    except Exception:
+                        pass
+
+                    return await message.reply(
+                        "🚫 Bypass Detected!\n\n"
+                        "Please complete the shortlink properly.\n"
+                        "Do not use bypass tools."
                     )
-                except Exception:
-                    pass
 
-                return await message.reply(
-                    "🚫 Bypass Detected!\n\n"
-                    "Please complete the shortlink properly.\n"
-                    "Do not use bypass tools."
-                )
+                # 🔴 TOKEN EXPIRED
+                if current_time - token_created_at > MAX_VERIFY_TIME:
+                    await db.update_verify_status(id, is_verified=False)
+                    return await message.reply(
+                        "⚠️ Token expired. Please generate a new verification link."
+                    )
 
-            # 🔴 Token Expired (Too Late)
-            if current_time - token_created_at > MAX_VERIFY_TIME:
-                await db.update_verify_status(id, is_verified=False)
-                return await message.reply(
-                    "⚠️ Token expired. Please generate a new verification link."
-                )
-
-                # ✅ Normal verification
+                # ✅ NORMAL VERIFICATION
                 await db.update_verify_status(
                     id,
                     is_verified=True,
@@ -142,8 +140,9 @@ if len(text) > 7:
                     f"✅ Token verified! Valid for {get_exp_time(VERIFY_EXPIRE)}"
                 )
 
+        # 🔹 Generate token if not verified
         if not verify_status['is_verified'] and not is_premium:
-            token = ''.join(random.choices(rohit.ascii_letters + rohit.digits, k=10))
+            token = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
 
             await db.update_verify_status(
                 id,
