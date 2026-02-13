@@ -231,33 +231,34 @@ class Rohit:
         return verify
 
     async def update_verify_status(
-    self,
-    user_id,
-    verify_token=None,
-    is_verified=None,
-    verified_time=None,
-    link=None,
-    token_created_at=None
-):
-    current = await self.db_verify_status(user_id)
+        self,
+        user_id,
+        verify_token=None,
+        is_verified=None,
+        verified_time=None,
+        link=None,
+        token_created_at=None
+    ):
+        current = await self.db_verify_status(user_id)
 
-    if verify_token is not None:
-        current['verify_token'] = verify_token
-        
-    if is_verified is not None:
-        current['is_verified'] = is_verified
+        if verify_token is not None:
+            current['verify_token'] = verify_token
 
-    if verified_time is not None:
-        current['verified_time'] = verified_time
+        if is_verified is not None:
+            current['is_verified'] = is_verified
 
-    if link is not None:
-        current['link'] = link
+        if verified_time is not None:
+            current['verified_time'] = verified_time
 
-    if token_created_at is not None:
-        current['token_created_at'] = token_created_at
+        if link is not None:
+            current['link'] = link
 
-    await self.db_update_verify_status(user_id, current)
+        if token_created_at is not None:
+            current['token_created_at'] = token_created_at
 
+        await self.db_update_verify_status(user_id, current)
+
+    
     
     # Set verify count (overwrite with new value)
     async def set_verify_count(self, user_id: int, count: int):
