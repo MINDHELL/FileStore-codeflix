@@ -89,7 +89,6 @@ async def cmd_set_delay(_, message):
     await set_delay(seconds)
     await message.reply(f"✅ Delay set to {seconds // 60} minutes")
 
-
 @Bot.on_message(filters.private & filters.command("start_t2") & filters.user(OWNER_ID))
 async def start_t2(client, message):
 
@@ -106,10 +105,10 @@ async def start_t2(client, message):
 
     current_id = last_id
     sent = 0
-    empty_count = 0  # ✅ stop after 2 missing ids
 
     while True:
 
+        # Stop if requested
         if await stop_requested():
             break
 
@@ -118,21 +117,18 @@ async def start_t2(client, message):
         except:
             break
 
-        if not msg:
-            empty_count += 1
-            if empty_count >= 2:
-                break
-            current_id += 1
-            continue
-
-        empty_count = 0  # reset if valid message found
+        # ✅ Proper end detection (VERY IMPORTANT FIX)
+        if not msg or msg.empty:
+            break
 
         await set_last_id(current_id)
 
+        # Skip empty/service messages
         if not (msg.text or msg.caption or msg.photo or msg.video or msg.document):
             current_id += 1
             continue
 
+        # Skip already sent messages
         if not await mark_sent(msg.id):
             current_id += 1
             continue
@@ -147,7 +143,8 @@ async def start_t2(client, message):
                 f"🆔 Last ID: {msg.id}"
             )
 
-            delay = await get_delay()  # ✅ dynamic delay
+            # ✅ Dynamic delay (reads latest delay each time)
+            delay = await get_delay()
             await asyncio.sleep(delay)
 
         except:
@@ -158,10 +155,13 @@ async def start_t2(client, message):
     await clear_stop()
 
     await status.edit(
-        f"✅ Target ➜ Target-2 stopped\n\n"
-        f"📤 Sent: {sent}\n"
-        f"🆔 Last Checked ID: {await get_last_id()}"
-            )
+        f"✅ Target ➜ Target-2 completed\n\n"
+        f"📤 Total Sent: {sent}\n"
+        f"🆔 Last Message ID: {await get_last_id()}"
+    )
+
+
+
 
 
 
