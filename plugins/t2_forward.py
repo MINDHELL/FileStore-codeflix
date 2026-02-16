@@ -106,6 +106,7 @@ async def start_t2(client, message):
 
     current_id = last_id
     sent = 0
+    empty_count = 0  # ✅ stop after 2 missing ids
 
     while True:
 
@@ -118,16 +119,20 @@ async def start_t2(client, message):
             break
 
         if not msg:
-            break
+            empty_count += 1
+            if empty_count >= 2:
+                break
+            current_id += 1
+            continue
+
+        empty_count = 0  # reset if valid message found
 
         await set_last_id(current_id)
 
-        # Skip service / empty messages
         if not (msg.text or msg.caption or msg.photo or msg.video or msg.document):
             current_id += 1
             continue
 
-        # Skip already sent
         if not await mark_sent(msg.id):
             current_id += 1
             continue
@@ -142,6 +147,7 @@ async def start_t2(client, message):
                 f"🆔 Last ID: {msg.id}"
             )
 
+            delay = await get_delay()  # ✅ dynamic delay
             await asyncio.sleep(delay)
 
         except:
@@ -152,16 +158,38 @@ async def start_t2(client, message):
     await clear_stop()
 
     await status.edit(
-        f"✅ Target ➜ Target-2 completed\n\n"
-        f"📤 Total Sent: {sent}\n"
-        f"🆔 Last Message ID: {await get_last_id()}"
-    )
+        f"✅ Target ➜ Target-2 stopped\n\n"
+        f"📤 Sent: {sent}\n"
+        f"🆔 Last Checked ID: {await get_last_id()}"
+            )
+
 
 
 @Bot.on_message(filters.private & filters.command("stop_t2") & filters.user(OWNER_ID))
 async def stop_t2(_, message):
     await request_stop()
     await message.reply("🛑 Target-2 forwarding stopped.")
+
+@Bot.on_message(filters.private & filters.command("start_t2_from_forward") & filters.user(OWNER_ID))
+async def start_from_forward(client, message):
+
+    if not message.reply_to_message:
+        return await message.reply("❌ Reply to a forwarded post from TARGET channel.")
+
+    fwd = message.reply_to_message
+
+    if not fwd.forward_from_message_id:
+        return await message.reply("❌ This is not a forwarded message.")
+
+    start_id = fwd.forward_from_message_id
+
+    await set_last_id(start_id)
+    await message.reply(
+        f"✅ Starting Target ➜ Target-2 from Message ID: {start_id}\n"
+        f"Now run /start_t2"
+    )
+
+
 
 
 @Bot.on_message(filters.private & filters.command("reset_t2") & filters.user(OWNER_ID))
