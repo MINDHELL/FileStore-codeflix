@@ -32,8 +32,8 @@ from database.db_premium import *
 
 BAN_SUPPORT = f"{BAN_SUPPORT}"
 TUT_VID = f"{TUT_VID}"
-MIN_VERIFY_TIME = 60  # seconds (anti-bypass protection)
-MAX_VERIFY_TIME = 180  # optional: token expires after 10 minutes
+MIN_VERIFY_TIME = 80  # seconds (anti-bypass protection)
+MAX_VERIFY_TIME = 260  # optional: token expires after 10 minutes
 
 
 @Bot.on_message(filters.command('start') & filters.private)
