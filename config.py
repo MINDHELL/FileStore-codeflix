@@ -28,15 +28,15 @@ OWNER = os.environ.get("OWNER", "Xsupprt4bot") # Owner username without @
 OWNER_ID = int(os.environ.get("OWNER_ID", "7437503888")) # Owner id
 #--------------------------------------------
 PORT = os.environ.get("PORT", "8001")
-SOURCE_CHANNEL = -1003701036114   # your source channel ID
-TARGET_CHANNEL = -1003798771315   # your target channel ID
+SOURCE_CHANNEL = -1003677185201   # your source channel ID
+TARGET_CHANNEL = -1003785389693   # your target channel ID
 AUTO_POST_DELAY = 20             # 5 minutes (safe)
-TARGET2_CHANNEL = -1003553308072  # second channel
+TARGET2_CHANNEL = -1003846202512  # second channel
 DELAY_SECONDS = 1800               # 1800 = 30 min, 3600 = 1 hour
 
 #--------------------------------------------
 DB_URI = os.environ.get("DATABASE_URL", "mongodb+srv://aarshhub:wcCgmKoCu2sTsEtv@cluster0.6shiu.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-DB_NAME = os.environ.get("DATABASE_NAME", "Cluooto")
+DB_NAME = os.environ.get("DATABASE_NAME", "Cluooxto")
 #--------------------------------------------
 FSUB_LINK_EXPIRY = int(os.getenv("FSUB_LINK_EXPIRY", "0"))  # 0 means no expiry
 BAN_SUPPORT = os.environ.get("BAN_SUPPORT", "https://t.me/Xsupprt3bot")
