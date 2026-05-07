@@ -29,7 +29,7 @@ OWNER_ID = int(os.environ.get("OWNER_ID", "7437503888")) # Owner id
 #--------------------------------------------
 PORT = os.environ.get("PORT", "8001")
 SOURCE_CHANNEL = -1003677185201   # your source channel ID
-TARGET_CHANNEL = -1003885646784   # your target channel ID
+TARGET_CHANNEL = -1003785389693   # your target channel ID
 AUTO_POST_DELAY = 20             # 5 minutes (safe)
 TARGET2_CHANNEL = -1003846202512  # second channel
 DELAY_SECONDS = 1800               # 1800 = 30 min, 3600 = 1 hour
