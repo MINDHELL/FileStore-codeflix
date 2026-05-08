@@ -92,7 +92,7 @@ async def already_posted(msg_id: int):
 @Bot.on_message(
     filters.private
     & filters.command("stop_autopost")
-    & filters.user([OWNER_ID])
+    & filters.user(OWNER_ID)
 )
 async def stop_autopost(_, message):
 
@@ -108,7 +108,7 @@ async def stop_autopost(_, message):
 @Bot.on_message(
     filters.private
     & filters.command(["reset_autopost", "restautopost"])
-    & filters.user([OWNER_ID])
+    & filters.user(OWNER_ID)
 )
 async def reset_autopost(_, message):
 
@@ -129,7 +129,7 @@ async def reset_autopost(_, message):
 @Bot.on_message(
     filters.private
     & filters.command("set_autopost_time")
-    & filters.user([OWNER_ID])
+    & filters.user(OWNER_ID)
 )
 async def set_autopost_time(_, message):
 
@@ -179,7 +179,7 @@ async def set_autopost_time(_, message):
 @Bot.on_message(
     filters.private
     & filters.command("autopost_old")
-    & filters.user([OWNER_ID])
+    & filters.user(OWNER_ID)
 )
 async def autopost_old(client, message):
 
