@@ -139,7 +139,7 @@ async def set_autopost_time(_, message):
         await message.reply(f"❌ Error:\n{e}")
 
 
-# ===================== AUTO POST =====================
+# ===================== AUTO POST ====================
 
 @Bot.on_message(filters.private & filters.command("autopost_old") & filters.user([OWNER_ID]))
 async def autopost_old(client, message):
@@ -151,7 +151,9 @@ async def autopost_old(client, message):
 
     posted = 0
     checked = 0
-    found_video = False
+
+    empty_streak = 0
+    MAX_EMPTY = 100
 
     delay = await get_delay()
 
@@ -163,35 +165,48 @@ async def autopost_old(client, message):
 
     while True:
 
-        # Stop if requested
+        # Stop command
         if await stop_requested():
             break
 
-        # ===================== GET MESSAGE =====================
-
         try:
-            msg = await client.get_messages(SOURCE_CHANNEL, current_id)
+            msg = await client.get_messages(
+                SOURCE_CHANNEL,
+                current_id
+            )
 
         except Exception as e:
-            print(f"GET MESSAGE ERROR: {e}")
-            break
+            print(f"GET ERROR: {e}")
 
-        # REAL Telegram end detection
+            current_id += 1
+            continue
+
+        # ================= EMPTY / DELETED IDS =================
+
         if not msg or msg.empty:
-            break
+
+            empty_streak += 1
+            current_id += 1
+
+            # real end detection
+            if empty_streak >= MAX_EMPTY:
+                break
+
+            continue
+
+        # valid message found
+        empty_streak = 0
 
         checked += 1
 
-        # ===================== SKIP NON VIDEOS =====================
+        # ================= ONLY VIDEOS / DOCUMENTS =================
 
         if not (msg.video or msg.document):
 
             current_id += 1
             continue
 
-        found_video = True
-
-        # ===================== SKIP DUPLICATES =====================
+        # ================= SKIP DUPLICATES =================
 
         if await already_posted(msg.id):
 
@@ -200,13 +215,14 @@ async def autopost_old(client, message):
 
         try:
 
-            # ===================== COPY TO DB =====================
+            # ================= COPY TO DB =================
 
             stored = await msg.copy(client.db_channel.id)
 
-            # ===================== GENERATE LINK =====================
+            # ================= CREATE LINK =================
 
             key = f"get-{stored.id * abs(client.db_channel.id)}"
+
             token = await encode(key)
 
             link = f"https://t.me/{client.username}?start={token}"
@@ -216,51 +232,46 @@ async def autopost_old(client, message):
                 f"🔗 <a href='{link}'>Watch / Download</a>"
             )
 
-            # ===================== THUMB =====================
+            # ================= GET THUMB =================
 
             thumb = None
 
             if msg.video and msg.video.thumbs:
-                thumb = await client.download_media(
-                    msg.video.thumbs[0].file_id
+
+                try:
+                    thumb = await client.download_media(
+                        msg.video.thumbs[0].file_id
+                    )
+
+                except:
+                    thumb = None
+
+            # ================= SEND TARGET POST =================
+
+            if thumb:
+
+                await client.send_photo(
+                    TARGET_CHANNEL,
+                    thumb,
+                    caption=caption
                 )
 
-            # ===================== SEND TO TARGET =====================
+            else:
 
-            try:
+                await client.send_message(
+                    TARGET_CHANNEL,
+                    caption
+                )
 
-                if thumb:
-                    await client.send_photo(
-                        TARGET_CHANNEL,
-                        thumb,
-                        caption
-                    )
-
-                else:
-                    await client.send_message(
-                        TARGET_CHANNEL,
-                        caption
-                    )
-
-            except Exception as e:
-
-                # Delete DB copy if target send fails
-                await stored.delete()
-
-                print(f"TARGET SEND ERROR: {e}")
-
-                current_id += 1
-                continue
-
-            # ===================== MARK SUCCESS =====================
+            # ================= SUCCESS =================
 
             await mark_posted(msg.id)
 
-            posted += 1
-
             await set_last_id(msg.id)
 
-            # ===================== STATUS =====================
+            posted += 1
+
+            # ================= STATUS =================
 
             if posted % 5 == 0:
 
@@ -268,10 +279,10 @@ async def autopost_old(client, message):
                     f"🚀 Posting...\n"
                     f"📤 Posted: {posted}\n"
                     f"🔎 Checked: {checked}\n"
-                    f"🆔 Last Video ID: {msg.id}"
+                    f"🆔 Last ID: {msg.id}"
                 )
 
-            # ===================== DYNAMIC DELAY =====================
+            # ================= DELAY =================
 
             delay = await get_delay()
 
@@ -281,31 +292,23 @@ async def autopost_old(client, message):
 
             print(f"POST ERROR: {e}")
 
-            current_id += 1
-            continue
+            # remove broken DB copy
+            try:
+                await stored.delete()
+            except:
+                pass
 
         current_id += 1
 
-    # ===================== CLEANUP =====================
+    # ================= CLEANUP =================
 
     await clear_stop()
 
-    # ===================== FINAL STATUS =====================
-
-    if not found_video:
-
-        await status.edit(
-            "✅ Auto-post completed\n\n"
-            "📭 No videos found."
-        )
-
-    else:
-
-        await status.edit(
-            f"✅ Auto-post completed successfully\n\n"
-            f"📤 New Videos Posted: {posted}\n"
-            f"🔎 Messages Checked: {checked}\n"
-            f"🆔 Last Video ID: {await get_last_id()}"
+    await status.edit(
+        f"✅ Auto-post completed\n\n"
+        f"📤 Posted: {posted}\n"
+        f"🔎 Checked: {checked}\n"
+        f"🆔 Last ID: {await get_last_id()}"
     )
 
-
+    
