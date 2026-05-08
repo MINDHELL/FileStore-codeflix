@@ -30,7 +30,7 @@ delay_col = db["autopost_delay"]
 
 async def get_last_id():
     data = await progress_col.find_one({"_id": "progress"})
-    return data["last_id"] if data else 1
+    return data["last_id"] if data else 0
 
 
 async def set_last_id(msg_id: int):
@@ -92,7 +92,7 @@ async def already_posted(msg_id: int):
 @Bot.on_message(
     filters.private
     & filters.command("stop_autopost")
-    & filters.user(OWNER_ID)
+    & filters.user([OWNER_ID])
 )
 async def stop_autopost(_, message):
 
@@ -108,7 +108,7 @@ async def stop_autopost(_, message):
 @Bot.on_message(
     filters.private
     & filters.command(["reset_autopost", "restautopost"])
-    & filters.user(OWNER_ID)
+    & filters.user([OWNER_ID])
 )
 async def reset_autopost(_, message):
 
@@ -129,7 +129,7 @@ async def reset_autopost(_, message):
 @Bot.on_message(
     filters.private
     & filters.command("set_autopost_time")
-    & filters.user(OWNER_ID)
+    & filters.user([OWNER_ID])
 )
 async def set_autopost_time(_, message):
 
@@ -179,14 +179,19 @@ async def set_autopost_time(_, message):
 @Bot.on_message(
     filters.private
     & filters.command("autopost_old")
-    & filters.user(OWNER_ID)
+    & filters.user([OWNER_ID])
 )
 async def autopost_old(client, message):
 
     await clear_stop()
 
     last_posted_id = await get_last_id()
-    current_id = last_posted_id + 1
+
+    # START CORRECTLY
+    if last_posted_id <= 0:
+        current_id = 1
+    else:
+        current_id = last_posted_id + 1
 
     posted = 0
     checked = 0
@@ -240,7 +245,6 @@ async def autopost_old(client, message):
             empty_streak += 1
             current_id += 1
 
-            # real channel end
             if empty_streak >= MAX_EMPTY:
                 break
 
@@ -251,7 +255,7 @@ async def autopost_old(client, message):
 
         checked += 1
 
-        # ================= ONLY VIDEOS =================
+        # ================= ONLY VIDEO/DOCUMENT =================
 
         if not (msg.video or msg.document):
 
@@ -291,25 +295,31 @@ async def autopost_old(client, message):
                 f"🔗 <a href='{link}'>Watch / Download</a>"
             )
 
-            # ================= GET THUMB =================
+            # ================= THUMBNAIL =================
 
             thumb = None
 
-            if msg.video and msg.video.thumbs:
+            try:
 
-                try:
+                if msg.video and msg.video.thumbs:
 
                     thumb = await client.download_media(
                         msg.video.thumbs[0].file_id
                     )
 
-                except Exception as e:
+                elif msg.document and msg.document.thumbs:
 
-                    print(f"THUMB ERROR: {e}")
+                    thumb = await client.download_media(
+                        msg.document.thumbs[0].file_id
+                    )
 
-                    thumb = None
+            except Exception as e:
 
-            # ================= SEND TARGET POST =================
+                print(f"THUMB ERROR: {e}")
+
+                thumb = None
+
+            # ================= SEND TO TARGET =================
 
             try:
 
@@ -365,7 +375,7 @@ async def autopost_old(client, message):
 
             print(f"POST ERROR: {e}")
 
-            # delete broken DB copy
+            # remove broken db copy
             try:
 
                 if stored:
@@ -387,4 +397,4 @@ async def autopost_old(client, message):
         f"📤 Posted: {posted}\n"
         f"🔎 Checked: {checked}\n"
         f"🆔 Last ID: {await get_last_id()}"
-    )
+)
