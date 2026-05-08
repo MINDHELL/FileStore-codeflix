@@ -1,10 +1,19 @@
-# (©) Codeflix-Bots | Auto Post Old Videos (FINAL UPDATED VERSION)
+# (©) Codeflix-Bots | Auto Post Old Videos (STABLE FINAL VERSION)
 
 import asyncio
 from pyrogram import filters
+from pyrogram.errors import FloodWait
 from bot import Bot
 from helper_func import encode
-from config import (SOURCE_CHANNEL,TARGET_CHANNEL,AUTO_POST_DELAY,OWNER_ID,DB_URI,DB_NAME)
+from config import (
+    SOURCE_CHANNEL,
+    TARGET_CHANNEL,
+    AUTO_POST_DELAY,
+    OWNER_ID,
+    DB_URI,
+    DB_NAME
+)
+
 import motor.motor_asyncio
 
 # ===================== MONGO SETUP =====================
@@ -63,7 +72,7 @@ async def set_delay(seconds: int):
     )
 
 
-# ===================== DUPLICATE PROTECTION =====================
+# ===================== DUPLICATE SYSTEM =====================
 
 async def mark_posted(msg_id: int):
     await posted_col.update_one(
@@ -78,16 +87,31 @@ async def already_posted(msg_id: int):
     return data is not None
 
 
-# ===================== ADMIN COMMANDS =====================
+# ===================== STOP COMMAND =====================
 
-@Bot.on_message(filters.private & filters.command("stop_autopost") & filters.user([OWNER_ID]))
+@Bot.on_message(
+    filters.private
+    & filters.command("stop_autopost")
+    & filters.user(OWNER_ID)
+)
 async def stop_autopost(_, message):
+
     await request_stop()
-    await message.reply("🛑 Auto-post stopped.")
+
+    await message.reply(
+        "🛑 Auto-post stopped."
+    )
 
 
-@Bot.on_message(filters.private & filters.command("reset_autopost") & filters.user([OWNER_ID]))
+# ===================== RESET COMMAND =====================
+
+@Bot.on_message(
+    filters.private
+    & filters.command(["reset_autopost", "restautopost"])
+    & filters.user(OWNER_ID)
+)
 async def reset_autopost(_, message):
+
     await progress_col.delete_many({})
     await posted_col.delete_many({})
     await control_col.delete_many({})
@@ -102,10 +126,15 @@ async def reset_autopost(_, message):
 
 # ===================== SET DELAY =====================
 
-@Bot.on_message(filters.private & filters.command("set_autopost_time") & filters.user([OWNER_ID]))
+@Bot.on_message(
+    filters.private
+    & filters.command("set_autopost_time")
+    & filters.user(OWNER_ID)
+)
 async def set_autopost_time(_, message):
 
     if len(message.command) < 2:
+
         return await message.reply(
             "❌ Usage:\n"
             "/set_autopost_time 20s\n"
@@ -116,6 +145,7 @@ async def set_autopost_time(_, message):
     val = message.command[1].lower()
 
     try:
+
         if val.endswith("s"):
             seconds = int(val[:-1])
 
@@ -126,7 +156,9 @@ async def set_autopost_time(_, message):
             seconds = int(val[:-1]) * 3600
 
         else:
-            return await message.reply("❌ Invalid format. Use 20s / 5m / 1h")
+            return await message.reply(
+                "❌ Invalid format.\nUse 20s / 5m / 1h"
+            )
 
         await set_delay(seconds)
 
@@ -136,12 +168,19 @@ async def set_autopost_time(_, message):
         )
 
     except Exception as e:
-        await message.reply(f"❌ Error:\n{e}")
+
+        await message.reply(
+            f"❌ Error:\n{e}"
+        )
 
 
-# ===================== AUTO POST ====================
+# ===================== AUTO POST =====================
 
-@Bot.on_message(filters.private & filters.command("autopost_old") & filters.user([OWNER_ID]))
+@Bot.on_message(
+    filters.private
+    & filters.command("autopost_old")
+    & filters.user(OWNER_ID)
+)
 async def autopost_old(client, message):
 
     await clear_stop()
@@ -165,30 +204,43 @@ async def autopost_old(client, message):
 
     while True:
 
-        # Stop command
+        # ================= STOP =================
+
         if await stop_requested():
             break
 
+        # ================= GET MESSAGE =================
+
         try:
+
             msg = await client.get_messages(
                 SOURCE_CHANNEL,
                 current_id
             )
 
+        except FloodWait as e:
+
+            print(f"FloodWait GET: {e.value}s")
+
+            await asyncio.sleep(e.value)
+
+            continue
+
         except Exception as e:
+
             print(f"GET ERROR: {e}")
 
             current_id += 1
             continue
 
-        # ================= EMPTY / DELETED IDS =================
+        # ================= EMPTY IDS =================
 
         if not msg or msg.empty:
 
             empty_streak += 1
             current_id += 1
 
-            # real end detection
+            # real channel end
             if empty_streak >= MAX_EMPTY:
                 break
 
@@ -199,25 +251,29 @@ async def autopost_old(client, message):
 
         checked += 1
 
-        # ================= ONLY VIDEOS / DOCUMENTS =================
+        # ================= ONLY VIDEOS =================
 
         if not (msg.video or msg.document):
 
             current_id += 1
             continue
 
-        # ================= SKIP DUPLICATES =================
+        # ================= DUPLICATE CHECK =================
 
         if await already_posted(msg.id):
 
             current_id += 1
             continue
 
+        stored = None
+
         try:
 
             # ================= COPY TO DB =================
 
-            stored = await msg.copy(client.db_channel.id)
+            stored = await msg.copy(
+                client.db_channel.id
+            )
 
             # ================= CREATE LINK =================
 
@@ -225,7 +281,10 @@ async def autopost_old(client, message):
 
             token = await encode(key)
 
-            link = f"https://t.me/{client.username}?start={token}"
+            link = (
+                f"https://t.me/"
+                f"{client.username}?start={token}"
+            )
 
             caption = (
                 "🎬 <b>Must Join @Allvidsbackup3</b>\n\n"
@@ -239,29 +298,43 @@ async def autopost_old(client, message):
             if msg.video and msg.video.thumbs:
 
                 try:
+
                     thumb = await client.download_media(
                         msg.video.thumbs[0].file_id
                     )
 
-                except:
+                except Exception as e:
+
+                    print(f"THUMB ERROR: {e}")
+
                     thumb = None
 
             # ================= SEND TARGET POST =================
 
-            if thumb:
+            try:
 
-                await client.send_photo(
-                    TARGET_CHANNEL,
-                    thumb,
-                    caption=caption
-                )
+                if thumb:
 
-            else:
+                    await client.send_photo(
+                        TARGET_CHANNEL,
+                        thumb,
+                        caption=caption
+                    )
 
-                await client.send_message(
-                    TARGET_CHANNEL,
-                    caption
-                )
+                else:
+
+                    await client.send_message(
+                        TARGET_CHANNEL,
+                        caption
+                    )
+
+            except FloodWait as e:
+
+                print(f"FloodWait SEND: {e.value}s")
+
+                await asyncio.sleep(e.value)
+
+                continue
 
             # ================= SUCCESS =================
 
@@ -282,7 +355,7 @@ async def autopost_old(client, message):
                     f"🆔 Last ID: {msg.id}"
                 )
 
-            # ================= DELAY =================
+            # ================= DYNAMIC DELAY =================
 
             delay = await get_delay()
 
@@ -292,9 +365,12 @@ async def autopost_old(client, message):
 
             print(f"POST ERROR: {e}")
 
-            # remove broken DB copy
+            # delete broken DB copy
             try:
-                await stored.delete()
+
+                if stored:
+                    await stored.delete()
+
             except:
                 pass
 
@@ -304,11 +380,11 @@ async def autopost_old(client, message):
 
     await clear_stop()
 
+    # ================= FINAL STATUS =================
+
     await status.edit(
         f"✅ Auto-post completed\n\n"
         f"📤 Posted: {posted}\n"
         f"🔎 Checked: {checked}\n"
         f"🆔 Last ID: {await get_last_id()}"
     )
-
-    
