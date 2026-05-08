@@ -59,13 +59,13 @@ async def try_mark_posted(msg_id: int) -> bool:
 
 # ===================== ADMIN COMMANDS =====================
 
-@Bot.on_message(filters.private & filters.command("stop_autopost") & filters.user(OWNER_ID))
+@Bot.on_message(filters.private & filters.command("stop_autopost") & filters.user([OWNER_ID]))
 async def stop_autopost(_, message):
     await request_stop()
     await message.reply("🛑 Auto-post stopped.")
 
 
-@Bot.on_message(filters.private & filters.command("reset_autopost") & filters.user(OWNER_ID))
+@Bot.on_message(filters.private & filters.command("reset_autopost") & filters.user([OWNER_ID]))
 async def reset_autopost(_, message):
     await progress_col.delete_many({})
     await posted_col.delete_many({})
@@ -80,7 +80,7 @@ async def reset_autopost(_, message):
 
 # ===================== AUTO POST =====================
 
-@Bot.on_message(filters.private & filters.command("autopost_old") & filters.user(OWNER_ID))
+@Bot.on_message(filters.private & filters.command("autopost_old") & filters.user([OWNER_ID]))
 async def autopost_old(client, message):
 
     await clear_stop()
